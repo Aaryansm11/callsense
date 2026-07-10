@@ -1,0 +1,79 @@
+"""Diarisation: who spoke when + advisor/customer roles (rubric §1.9, §6.4).
+
+Strategy, cheapest-correct first:
+1. If segments are already speaker-labelled (mock fixture, or a diarising cloud
+   STT), pass them through.
+2. Stereo call recordings put advisor on one channel, customer on the other →
+   per-segment channel energy assigns the speaker with zero ML (left=advisor).
+3. Mono / unreadable audio → turn-based fallback (alternate speakers), returned
+   with low confidence so the call page can show a "low diarisation confidence"
+   banner. We still score what's scoreable rather than going silent.
+"""
+
+from __future__ import annotations
+
+import logging
+
+from transcription.base import TxSegment
+
+log = logging.getLogger("callsense.diarize")
+
+# Below this L/R energy separation a "stereo" file is effectively mono.
+_STEREO_SEPARATION_MIN = 0.15
+
+
+def diarise(
+    audio_uri: str, channels: int | None, segments: list[TxSegment]
+) -> tuple[list[TxSegment], float]:
+    if segments and all(s.speaker != "unknown" for s in segments):
+        return segments, 1.0
+    if channels and channels >= 2:
+        result = _channel_split(audio_uri, segments)
+        if result is not None:
+            return result
+    return _turn_fallback(segments), 0.5
+
+
+def _channel_split(
+    audio_uri: str, segments: list[TxSegment]
+) -> tuple[list[TxSegment], float] | None:
+    try:
+        import numpy as np
+        import soundfile as sf
+
+        data, sr = sf.read(audio_uri, always_2d=True)
+    except Exception as exc:  # noqa: BLE001 - any decode/read issue -> fallback
+        log.warning("channel-split unavailable (%s); using turn fallback", exc)
+        return None
+
+    if data.shape[1] < 2:
+        return None
+
+    left, right = data[:, 0], data[:, 1]
+    separations: list[float] = []
+    for seg in segments:
+        a, b = int(seg.start_s * sr), int(seg.end_s * sr)
+        a, b = max(0, a), min(len(data), b)
+        if b <= a:
+            seg.speaker = "unknown"
+            continue
+        l_rms = float(np.sqrt(np.mean(left[a:b] ** 2)) + 1e-9)
+        r_rms = float(np.sqrt(np.mean(right[a:b] ** 2)) + 1e-9)
+        total = l_rms + r_rms
+        separations.append(abs(l_rms - r_rms) / total)
+        seg.speaker = "advisor" if l_rms >= r_rms else "customer"  # left = advisor
+
+    mean_sep = sum(separations) / len(separations) if separations else 0.0
+    if mean_sep < _STEREO_SEPARATION_MIN:
+        # Channels barely differ -> treat as mono.
+        return _turn_fallback(segments), 0.5
+    return segments, round(min(1.0, 0.6 + mean_sep), 3)
+
+
+def _turn_fallback(segments: list[TxSegment]) -> list[TxSegment]:
+    """Alternate speakers on each turn, starting with the advisor."""
+    speaker = "advisor"
+    for i, seg in enumerate(segments):
+        seg.speaker = speaker
+        speaker = "customer" if speaker == "advisor" else "advisor"
+    return segments

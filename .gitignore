@@ -1,0 +1,35 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# --- Env / secrets ---
+.env
+.env.local
+
+# --- Local database (conda-provided Postgres data dir) ---
+.pgdata/
+
+# --- Audio / models (large, generated) ---
+demo/audio/inbox/
+demo/audio/store/
+demo/audio/*.wav
+demo/audio/*.mp3
+models/
+*.ckpt
+
+# --- Node / Next.js (frontend, later phase) ---
+node_modules/
+.next/
+frontend/.env*.local
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

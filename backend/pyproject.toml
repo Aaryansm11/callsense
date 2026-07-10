@@ -1,0 +1,15 @@
+[project]
+name = "callsense-backend"
+version = "0.1.0"
+description = "CallSense — sales-call intelligence backend (API + pipeline + analysis)."
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+# Run from the backend/ dir so `app` and `db` import as top-level packages.
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"

@@ -1,0 +1,93 @@
+# CallSense — one-command stack (rubric §4 "Packaging").
+# `docker compose up -d --build` brings up: postgres + api (auto-migrates) +
+# worker. The web (Next.js) service is reserved below and enabled in the
+# frontend phase once frontend/ exists.
+#
+# NOTE: this file is authored to the plan but NOT yet verified on this machine
+# (Docker Desktop is not installed here). The schema, migrations and API are
+# verified locally against a conda-provided Postgres — see README "Local dev".
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: callsense
+      POSTGRES_PASSWORD: callsense
+      POSTGRES_DB: callsense
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U callsense -d callsense"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://callsense:callsense@postgres:5432/callsense
+      ENVIRONMENT: docker
+      MOCK_MODE: "true"
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://callsense:callsense@postgres:5432/callsense
+      ENVIRONMENT: docker
+      MOCK_MODE: "true"
+    command: python -m pipeline.worker
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # One-shot: seed demo data (1 org, 3 teams, 9 advisors, ~25 calls) then exit.
+  # Run explicitly:  docker compose run --rm seed
+  seed:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg://callsense:callsense@postgres:5432/callsense
+      MOCK_MODE: "true"
+      PYTHONPATH: /app
+      SEED_AUDIO_DIR: /demo/audio/store
+    command: python /demo/seed.py
+    working_dir: /app
+    volumes:
+      - ./demo:/demo
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["tools"]
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Baked into the client bundle; the browser reaches the API on the host.
+        NEXT_PUBLIC_API_URL: http://localhost:8000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+
+volumes:
+  pgdata:
