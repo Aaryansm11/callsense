@@ -73,7 +73,7 @@ def make_wav(path: Path, seconds: float, freq: int, sr: int = 8000) -> None:
 def reset_and_seed_org() -> None:
     with SessionLocal() as s:
         s.execute(text("TRUNCATE " + ", ".join(TABLES) + " RESTART IDENTITY CASCADE"))
-        s.execute(text("INSERT INTO orgs(id, name) VALUES (1, 'FitNova (SkilloVilla)')"))
+        s.execute(text("INSERT INTO orgs(id, name) VALUES (1, 'FitNova')"))
         for idx, name in enumerate(TEAMS, start=1):
             s.execute(text("INSERT INTO teams(id, org_id, name) VALUES (:id, 1, :n)"),
                       {"id": idx, "n": name})

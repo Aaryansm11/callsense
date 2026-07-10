@@ -1,5 +1,6 @@
 "use client";
 
+import { Dumbbell } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -18,14 +19,19 @@ export function Header() {
     <header className="sticky top-0 z-20 border-b border-border bg-white/80 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
         <Link href="/director" className="flex items-center gap-2.5">
-          {/* SkilloVilla brand mark (downloaded into /public) */}
-          <img
-            src="/skillovilla-mark.png"
-            alt="SkilloVilla"
-            width={32}
-            height={32}
-            className="rounded-md"
-          />
+          {/* SkilloVilla brand mark + a dumbbell badge for the fitness domain */}
+          <span className="relative inline-block">
+            <img
+              src="/skillovilla-mark.png"
+              alt="SkilloVilla"
+              width={32}
+              height={32}
+              className="rounded-md"
+            />
+            <span className="absolute -bottom-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-brand text-white ring-2 ring-white">
+              <Dumbbell size={9} strokeWidth={2.75} />
+            </span>
+          </span>
           <div className="leading-tight">
             <div className="text-sm font-semibold text-ink">CallSense</div>
             <div className="text-[11px] text-muted">

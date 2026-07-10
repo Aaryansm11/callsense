@@ -7,10 +7,10 @@ import { Button } from "./ui";
 
 // Mock-mode fixtures the canned analysis maps to (drives the demo result).
 const FIXTURES = [
-  { value: "over_promiser", label: "Over-promiser (guaranteed placement)" },
+  { value: "over_promiser", label: "Over-promiser (guaranteed weight loss)" },
   { value: "good_discovery", label: "Great discovery call" },
   { value: "pushy_pressure", label: "Pushy / pressure tactics" },
-  { value: "hidden_costs", label: "Hidden costs" },
+  { value: "hidden_costs", label: "Hidden costs (registration / auto-renewal)" },
   { value: "non_sales", label: "Non-sales (wrong number)" },
 ];
 

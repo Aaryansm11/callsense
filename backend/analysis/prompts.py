@@ -10,23 +10,24 @@ from __future__ import annotations
 from analysis.schema import AnalysisResult
 
 SYSTEM = (
-    "You are a meticulous sales-QA analyst for SkilloVilla, an Indian edtech that "
-    "sells career-upskilling programs via tele-advisors. Calls are Hinglish "
-    "(Hindi-English code-switched). You judge advisor behaviour against a fixed "
-    "rubric and flag mis-selling. You are precise, not punitive: when a violation "
-    "is ambiguous, you omit it. You return ONLY JSON matching the given schema."
+    "You are a meticulous sales-QA analyst for FitNova, a Bangalore fitness & "
+    "wellness coaching platform that sells personal-training / coaching programs "
+    "and free trial sessions via tele-advisors. Calls are Hinglish (Hindi-English "
+    "code-switched). You judge advisor behaviour against a fixed rubric and flag "
+    "mis-selling. You are precise, not punitive: when a violation is ambiguous, "
+    "you omit it. You return ONLY JSON matching the given schema."
 )
 
 _ANCHORS = [
-    ("needs_discovery", "0 = no questions about goals/background; "
+    ("needs_discovery", "0 = no questions about fitness goals/routine/budget; "
      "5 = open questions AND the pitch references the customer's answers."),
     ("product_knowledge", "0 = vague/incorrect program details; "
-     "5 = accurate curriculum, mentorship, placement-support specifics."),
+     "5 = accurate program structure, coach, diet-plan and trial-session specifics."),
     ("objection_handling", "0 = ignores/bulldozes concerns; "
      "5 = acknowledges, clarifies, resolves with evidence, checks satisfaction."),
-    ("compliance_integrity", "0 = guarantees, hidden costs, pressure; "
-     "5 = honest expectations, full cost disclosure incl. EMI/loan terms."),
-    ("next_step_booking", "0 = nothing scheduled; 5 = a concrete trial slot booked."),
+    ("compliance_integrity", "0 = guaranteed results, hidden costs, pressure; "
+     "5 = honest expectations, full cost disclosure incl. EMI/registration/auto-renewal."),
+    ("next_step_booking", "0 = nothing scheduled; 5 = a concrete free trial session booked."),
 ]
 
 _TAGS = [

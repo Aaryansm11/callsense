@@ -1,16 +1,18 @@
 # CallSense — Design Writeup
 
 ## The problem, in one breath
-SkilloVilla runs tele-sales through advisors; TLs can manually review ~5% of calls, so
-mis-selling ("guaranteed placement", hidden EMI/loan costs) is usually found only at
+FitNova (a Bangalore fitness & wellness coaching platform) runs tele-sales through
+advisors; TLs can manually review ~5% of calls, so mis-selling ("weight loss
+guaranteed", hidden auto-renewal/registration costs) is usually found only at
 customer-complaint time. CallSense converts 100% of calls into scored, flagged,
 reviewable records the same day — and gives advisors due process so they trust it.
 
 ## What I optimised for
-A lean (~70-person) seed-stage org with an ex-Swiggy CTO. That drives three biases:
-**cheap to run** (local Whisper = ₹0/call), **low-ops** (docker compose + one Postgres,
-no Kubernetes/Kafka cosplay), and **depth in the boring parts** (idempotency, queue
-semantics, failure modes, data modelling) over trendy infra.
+A fast-growing org with hundreds of advisors in pods, where choosing a coaching program
+runs on trust. That drives three biases: **cheap to run** (local Whisper = ₹0/call),
+**low-ops** (docker compose + one Postgres, no Kubernetes/Kafka cosplay), and **depth in
+the boring parts** (idempotency, queue semantics, failure modes, data modelling) over
+trendy infra.
 
 ## Key design decisions & trade-offs
 

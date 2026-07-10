@@ -1,11 +1,15 @@
-# CallSense — Sales-Call Intelligence for SkilloVilla
+# CallSense — Sales-Call Intelligence for FitNova
+
+Built for the FitNova brief (a Bangalore fitness & wellness coaching platform selling
+personal-training programs + free trial sessions over the phone). Branded for
+SkilloVilla.
 
 Every sales call is **ingested** from any source, **transcribed + diarised**, **scored**
 against a 5-dimension rubric by an LLM that must **quote its evidence**, **flagged**
-for mis-selling with timestamps, stored in **Postgres**, and surfaced on three
-role-specific **dashboards** (Director / Team Leader / Advisor) — with a human
-**dispute loop** that recomputes scores and feeds few-shot calibration back into the
-prompt. One command brings the whole thing up.
+for mis-selling (e.g. "weight loss guaranteed") with timestamps, stored in **Postgres**,
+and surfaced on three role-specific **dashboards** (Director / Team Leader / Advisor) —
+with a human **dispute loop** that recomputes scores and feeds few-shot calibration
+back into the prompt. One command brings the whole thing up.
 
 > Design docs: [`CallSense_0-1_Plan.md`](CallSense_0-1_Plan.md) ·
 > [`CallSense_Concepts_Explained.md`](CallSense_Concepts_Explained.md)
@@ -131,8 +135,8 @@ now and a fine-tuning set later (roadmap).
 
 1. `make demo` → open **http://localhost:3000**.
 2. **Director**: org score, trend, team bars, risk feed.
-3. Upload a call (Director → *Ingest a call*, pick "Over-promiser") → lands on the
-   **call detail** page.
+3. Upload a call (Director → *Ingest a call*, pick "Over-promiser — guaranteed weight
+   loss") → lands on the **call detail** page.
 4. Click the `over_promising` flag → audio **seeks** to the quote; note the composite
    is **capped at 40**.
 5. On the flag, click **Dispute** → add a note → submit.
