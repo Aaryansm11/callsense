@@ -44,10 +44,26 @@ class Settings(BaseSettings):
     # MOCK_MODE=true runs the whole loop with canned fixtures and zero network
     # so graders without API keys still see the full system work.
     mock_mode: bool = True
-    anthropic_api_key: str | None = None
-    llm_model: str = "claude-sonnet-5"  # rubric analysis (nuanced judgment)
-    classifier_model: str = "claude-haiku-4-5-20251001"  # cheap sales/non-sales
+    llm_provider: str = "gemini"  # mock | gemini | anthropic (used when mock_mode=false)
     llm_temperature: float = 0.0
+
+    # Gemini (Google AI Studio) — the default real provider.
+    gemini_api_key: str | None = None
+    # Flash-lite is the reliable default: free-tier flash/pro quotas exhaust fast
+    # and get 429/503, while lite has ample quota and handles this structured task
+    # well (verified). Bump to gemini-flash-latest / gemini-3.1-pro for higher
+    # judgment quality if the key's quota allows.
+    gemini_model: str = "gemini-flash-lite-latest"  # rubric analysis
+    gemini_classifier_model: str = "gemini-flash-lite-latest"  # cheap sales/non-sales
+
+    # Anthropic (alternative provider).
+    anthropic_api_key: str | None = None
+    llm_model: str = "claude-sonnet-5"
+    classifier_model: str = "claude-haiku-4-5-20251001"
+
+    # Client-side rate limiting for the LLM (protects free-tier quotas).
+    llm_min_interval_s: float = 1.0  # min seconds between LLM calls
+    llm_max_retries: int = 4  # retries on 429 / resource-exhausted
 
     # --- Transcription / diarisation (used from Phase 3+) ----------------
     whisper_model: str = "small"  # tiny|base|small|medium|large
