@@ -1,4 +1,6 @@
-# CallSense — Sales-Call Intelligence for FitNova
+﻿# CallSense — Sales-Call Intelligence for FitNova
+
+**Live demo:** https://callsense-aaryan-s-maralihallis-projects.vercel.app · API: https://callsense-production-d0b3.up.railway.app/docs (real mode: Whisper + Gemini in the cloud)
 
 Built for the FitNova brief (a Bangalore fitness & wellness coaching platform selling
 personal-training programs + free trial sessions over the phone). Branded for
