@@ -1,0 +1,7 @@
+# Real-mode extras (MOCK_MODE=false): local speech-to-text.
+# The base image runs the full loop with mocks without these; install them when
+# you want actual transcription:  pip install -r requirements-real.txt
+-r requirements.txt
+faster-whisper>=1.0
+# anthropic>=0.40        # optional: LLM_PROVIDER=anthropic
+# edge-tts>=6.1          # optional: regenerate demo/testcall audio

@@ -20,6 +20,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from analysis.llm import get_llm
+from analysis.metrics import TALK_RATIO_THRESHOLD, talk_ratio
 from analysis.prompts import SYSTEM, build_analysis_user_prompt
 from analysis.rubric import (
     CONFIDENCE_THRESHOLD,
@@ -123,6 +124,39 @@ def run(session: Session, call_id: int) -> None:
             },
         )
         kept += 1
+
+    # --- Deterministic metric flag: talk ratio ----------------------------
+    # Computed by code from diarised segment durations, never by the LLM.
+    ratio = talk_ratio(segments)
+    if ratio is not None:
+        session.execute(
+            text(
+                "UPDATE calls SET raw_metadata = raw_metadata || "
+                "CAST(:patch AS jsonb) WHERE id = :cid"
+            ),
+            {"patch": f'{{"talk_ratio": {ratio}}}', "cid": call_id},
+        )
+        if ratio > TALK_RATIO_THRESHOLD:
+            session.execute(
+                text(
+                    """
+                    INSERT INTO flags
+                        (call_id, tag, severity, quote, reason, confidence,
+                         state, created_at)
+                    VALUES (:cid, 'talk_over_customer', 'info', NULL, :reason,
+                            1.0, 'open', now())
+                    """
+                ),
+                {
+                    "cid": call_id,
+                    "reason": (
+                        f"Advisor spoke {ratio:.0%} of the conversation "
+                        f"(threshold {TALK_RATIO_THRESHOLD:.0%}) — measured from "
+                        "diarised segment durations."
+                    ),
+                },
+            )
+            kept += 1
 
     # --- Composite (with compliance cap) ---------------------------------
     composite, capped = compute_composite(dim_scores, has_critical)

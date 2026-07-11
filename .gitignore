@@ -18,6 +18,7 @@ venv/
 # --- Audio / models (large, generated) ---
 demo/audio/inbox/
 demo/audio/store/
+demo/audio/testcalls/
 demo/audio/*.wav
 demo/audio/*.mp3
 models/

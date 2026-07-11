@@ -1,6 +1,5 @@
-# Runtime dependencies (Phase 1). Heavy ML deps (faster-whisper, pyannote,
-# spaCy, anthropic) are added in the phases that use them to keep the Phase-1
-# image/env small and fast to build.
+# Runtime dependencies. The default (MOCK_MODE) image stays slim; real-mode
+# STT extras live in requirements-real.txt.
 fastapi>=0.111
 uvicorn[standard]>=0.30
 sqlalchemy>=2.0
@@ -10,3 +9,5 @@ pydantic>=2.7
 pydantic-settings>=2.3
 python-dotenv>=1.0
 google-genai>=0.3        # Gemini (Google AI Studio) — real LLM provider
+numpy>=1.26              # acoustic diarisation (voice clustering)
+soundfile>=0.12          # audio decode for diarisation (bundles libsndfile)
