@@ -157,16 +157,35 @@ def summary() -> None:
 
 def _should_seed() -> bool:
     """SEED_MODE=always (default) → reset + reseed. SEED_MODE=if-empty → only
-    when no org exists yet (used by long-lived deployments)."""
+    when no org exists yet (used by long-lived deployments so disputes and
+    calibration examples persist across restarts)."""
     if os.environ.get("SEED_MODE", "always").lower() != "if-empty":
         return True
     with SessionLocal() as s:
         return s.execute(text("SELECT count(*) FROM orgs")).scalar_one() == 0
 
 
+def regenerate_seed_audio() -> None:
+    """Recreate the demo WAVs on this container's disk WITHOUT touching the DB.
+
+    Ephemeral filesystems lose the files on every restart while the rows in
+    Postgres persist; the seed uses deterministic filenames and synthesized
+    audio, so rebuilding just the files re-arms the play buttons for the 25
+    demo calls. (Uploads from previous container lives keep their rows —
+    scores, flags, disputes — but their audio is gone; durable object storage
+    like S3/MinIO is the production answer.)"""
+    random.seed(7)
+    for i in range(N_CALLS):
+        make_wav(AUDIO_DIR / f"call_{i:02d}.wav",
+                 seconds=1.0 + (i % 5) * 0.1, freq=180 + i * 7)
+    print(f"regenerated {N_CALLS} seed WAVs in {AUDIO_DIR}")
+
+
 if __name__ == "__main__":
     if not _should_seed():
-        print("SEED_MODE=if-empty and data exists; skipping seed.")
+        print("SEED_MODE=if-empty and data exists; keeping ALL rows "
+              "(uploads, disputes, calibration examples).")
+        regenerate_seed_audio()
         raise SystemExit(0)
     print("Seeding CallSense demo data...")
     reset_and_seed_org()
