@@ -1,94 +1,79 @@
-# Deploying CallSense (live link, no local machine needed)
+# Deploying CallSense (live link, REAL Whisper + Gemini, all free)
 
-Three free-tier pieces. Your laptop can be **off** — everything runs in the cloud.
+Your laptop can be off — everything runs in the cloud, in **real mode**:
 
 ```
-Vercel (Next.js frontend)  →  Render (FastAPI + inline worker, Docker)  →  Neon (Postgres)
-        free                          free (mock) / ~$7 (real mode)            free
+Vercel (Next.js frontend)  →  HF Space (FastAPI + worker, Docker, REAL mode)  →  Neon (Postgres)
+        free                    free · 2 vCPU · 16GB RAM · Whisper fits            free
 ```
 
-**API keys never touch GitHub.** The repo is key-free (`.env` is gitignored);
-the Gemini key is pasted once into Render's dashboard as a server-side
-environment variable. The browser talks only to your API — the key never
-reaches the client.
+Why a Hugging Face Space for the backend: it's the only mainstream free tier
+with enough RAM (16GB) to run faster-whisper. Render's free 512MB only fits the
+mock loop (kept in `render.yaml` as a fallback).
+
+**API keys never touch GitHub.** The repo is key-free; secrets are set
+server-side on the Space via API. The browser talks only to your API.
 
 ---
 
-## 0. Prerequisites (one-time, ~10 min)
+## 1. Neon — cloud Postgres (done ✅)
 
-Accounts (all free, sign in with GitHub): [neon.tech](https://neon.tech) ·
-[render.com](https://render.com) · [vercel.com](https://vercel.com), and the
-repo pushed to GitHub.
+Project created; migrations applied. The connection string (SQLAlchemy form —
+note the `+psycopg`):
+`postgresql+psycopg://USER:PASS@HOST/neondb?sslmode=require`
 
-## 1. Neon — cloud Postgres (~3 min)
+## 2. Hugging Face Space — the API + worker (~5 min)
 
-1. New project → name `callsense` → region Singapore (closest to India).
-2. Copy the connection string and adapt it for SQLAlchemy/psycopg — prefix
-   `postgresql+psycopg://` instead of `postgresql://`:
-   `postgresql+psycopg://USER:PASSWORD@HOST/callsense?sslmode=require`
-3. Seed the demo data **from your machine** (one-off):
+1. Create a free account at **huggingface.co** (no card).
+2. Settings → **Access Tokens** → *Create new token* → type **Write** → copy it.
+3. One command from the repo root:
    ```powershell
-   $env:DATABASE_URL = "postgresql+psycopg://...neon.../callsense?sslmode=require"
-   cd backend; conda run -n callsense alembic upgrade head; cd ..
-   conda run -n callsense python demo/seed.py
+   ./scripts/deploy_hf_space.ps1 -Token hf_xxx `
+       -DatabaseUrl "postgresql+psycopg://...neon.../neondb?sslmode=require" `
+       -GeminiKey "your-ai-studio-key"
    ```
-   (Migrations also run automatically on every API boot, so step 3's alembic
-   part is belt-and-braces.)
+   It creates the Space, sets the two secrets server-side, and pushes the code.
+   First build ≈ 8–10 min (bakes the Whisper model into the image).
+4. Watch the build at `https://huggingface.co/spaces/<you>/callsense`; the API
+   base URL is `https://<you>-callsense.hf.space` — check `/health/db`.
 
-## 2. Render — the API + worker (~5 min)
-
-1. New → **Blueprint** → pick your GitHub repo (it reads `render.yaml`).
-2. When prompted, fill the two secrets:
-   - `DATABASE_URL` = the Neon string from step 1
-   - `GEMINI_API_KEY` = your AI Studio key (used only if you enable real mode)
-3. Deploy. First build ~5 min. Verify: `https://callsense-api.onrender.com/health/db`
-   → `{"status":"ok","db":"up"}`.
-
-Notes:
-- Free tier = 512MB RAM → ships with `MOCK_MODE=true`: the full loop (upload →
-  queue → stages → dashboards → disputes) runs on canned analyses. This is the
-  honest fit for 512MB — Whisper needs ~2GB.
-- **Real mode in the cloud**: upgrade the service to Starter (2GB), set
-  `MOCK_MODE=false`, add `pip install -r requirements-real.txt` to the
-  Dockerfile (or bake a real-mode image), redeploy.
-- Free services sleep after 15 min idle; first request takes ~40s to wake.
+Boot sequence per container start: migrations → demo seed (audio regenerated
+inside the container, so playback works) → API + inline worker in **real mode**.
+Note: the Space's filesystem is ephemeral — a restart reseeds the demo data and
+uploaded audio from previous sessions disappears (Neon keeps the rows).
+Public Space = source visible there; keep it private instead with `-Private`
+(then only you can open the app).
 
 ## 3. Vercel — the frontend (~3 min)
 
-1. New Project → import the repo → **Root Directory: `frontend`** (Vercel
-   auto-detects Next.js).
-2. Environment variable: `NEXT_PUBLIC_API_URL = https://callsense-api.onrender.com`
-3. Deploy → `https://callsense-<something>.vercel.app` is your live link.
+1. vercel.com → sign in with GitHub → Add New → Project → import `callsense`.
+2. **Root Directory = `frontend`** (critical).
+3. Env var: `NEXT_PUBLIC_API_URL = https://<you>-callsense.hf.space`
+4. Deploy → your live link.
 
-## 4. Show interviewers the data
+## 4. Showing interviewers the data
 
-- **Neon console → Tables** — every table (calls, segments, scores, flags,
-  disputes, audit_log, processing_jobs) browsable with row contents, plus a
-  built-in SQL editor for live queries (`SELECT * FROM v_team_scores;`).
-- The app itself surfaces pipeline state at `/ops/jobs` and the About page
-  explains the schema in prose.
+Neon console → **Tables** (browse calls/segments/scores/flags/disputes/audit
+live) or its **SQL Editor**: `SELECT * FROM v_team_scores;`. In-app: `/about`
+explains the schema; `/ops/jobs` shows the queue.
 
-## Security & limits (what's already handled)
+## Security & limits
 
 | Concern | Handling |
 |---|---|
-| Secrets | Env vars only; `.env` gitignored; keys server-side, never in the client bundle |
-| SQL injection | All queries parameterised (SQLAlchemy `text()` binds) |
-| Upload abuse | 200MB size cap + 10 uploads/min/IP rate limit (429 + Retry-After) |
-| LLM quota | Client-side throttle (1 rps) + exponential backoff on 429/503, then job-level retry/dead-letter |
+| Secrets | Server-side env only; `.env` gitignored; never in the client bundle |
+| SQL injection | Parameterised queries throughout |
+| Upload abuse | 200MB cap + 10 uploads/min/IP (429 + Retry-After) |
+| LLM quota | 1 rps client throttle + backoff on 429/503 + job retry/dead-letter |
 | Double-processing | sha256 idempotency key + idempotent stages |
-| PII | Redacted before any external API; raw text in a restricted column |
-| XSS | React auto-escaping; no `dangerouslySetInnerHTML` |
-| Known gaps (scope) | No auth (role switcher by design), open CORS for the demo, in-memory rate limiter is per-process |
+| PII | Redacted before any external API; raw text restricted |
+| Known gaps (scope) | No auth (role switcher by design); open CORS; per-process rate limiter |
 
-## Capacity (measured / derived)
+## Capacity (measured)
 
-- **Transcription**: ~3.3× real-time per CPU worker (11.5-min call → 3m32s,
-  Whisper small/int8). ≈ **300–400 five-minute calls/day per worker**; workers
-  are stateless → scale horizontally.
-- **LLM**: 2 calls per analysed call. Free-tier Gemini flash-lite sustains
-  ≈ **500+ calls/day**; paid tier removes the ceiling.
-- **Postgres/queue**: trivially fine to ~10k jobs/day (Neon free: 0.5GB ≈
-  hundreds of thousands of calls' metadata).
-- **First bottleneck at 10×**: Whisper on CPU → GPU worker pool → managed STT
-  overflow → materialise rollup views. No schema changes.
+- Whisper small/int8: **~3.3× real-time** on a local CPU (11.5-min call →
+  3m32s); on the Space's 2 vCPU expect ~1–2× real-time → a 2-min call ≈ 1–2 min.
+- Gemini free tier: **~500+ calls/day** (2 LLM calls per call, throttled).
+- Neon free (0.5GB): metadata for hundreds of thousands of calls.
+- First bottleneck at 10×: Whisper on CPU → GPU workers → managed STT. No
+  schema changes.

@@ -155,7 +155,19 @@ def summary() -> None:
         print(f"  org avg composite: {org}")
 
 
+def _should_seed() -> bool:
+    """SEED_MODE=always (default) → reset + reseed. SEED_MODE=if-empty → only
+    when no org exists yet (used by long-lived deployments)."""
+    if os.environ.get("SEED_MODE", "always").lower() != "if-empty":
+        return True
+    with SessionLocal() as s:
+        return s.execute(text("SELECT count(*) FROM orgs")).scalar_one() == 0
+
+
 if __name__ == "__main__":
+    if not _should_seed():
+        print("SEED_MODE=if-empty and data exists; skipping seed.")
+        raise SystemExit(0)
     print("Seeding CallSense demo data...")
     reset_and_seed_org()
     seed_calls()

@@ -11,3 +11,4 @@ python-dotenv>=1.0
 google-genai>=0.3        # Gemini (Google AI Studio) — real LLM provider
 numpy>=1.26              # acoustic diarisation (voice clustering)
 soundfile>=0.12          # audio decode for diarisation (bundles libsndfile)
+python-multipart>=0.0.9  # FastAPI multipart form parsing (upload endpoint)
