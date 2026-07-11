@@ -26,8 +26,11 @@ back into the prompt. One command brings the whole thing up.
   validate), retries with exponential backoff + jitter, dead-lettering, and
   crash-resume via a visibility timeout.
 - **Transcription + diarisation** — local `faster-whisper` (Hinglish, int8) behind a
-  `Transcriber` interface; stereo channel-split diarisation with a mono turn-based
-  fallback. `MockTranscriber` runs the loop with no model/network.
+  `Transcriber` interface; diarisation is stereo channel-split when channels
+  differ, **acoustic voice clustering for mono** (per-segment spectral-envelope +
+  pitch fingerprints, 2-means, advisor = call opener; numpy-only, no gated
+  models), and turn-alternation only as the last resort with a low-confidence
+  banner. `MockTranscriber` runs the loop with no model/network.
 - **Analysis engine** — rubric scoring + issue flags via an `LLM` interface
   (Anthropic, or `MockLLM`), forced JSON + Pydantic validation, the
   **quote-verification gate** (fuzzy-match each quote to the transcript; unmatched →
@@ -116,7 +119,7 @@ flowchart LR
 | Postgres schema, migrations, rollup views | **Real** |
 | Ingestion adapters, ffprobe validation, idempotency | **Real** |
 | Job queue (SKIP LOCKED), retries, dead-letter, resume | **Real** |
-| Diarisation (stereo channel-split + mono fallback) | **Real** |
+| Diarisation (stereo channel-split; mono = acoustic voice clustering, turn fallback last) | **Real** |
 | PII redaction (regex + Luhn) | **Real** |
 | Quote-verification gate, compliance cap, scoring | **Real** |
 | Dashboards + call detail + audio-synced transcript | **Real** |

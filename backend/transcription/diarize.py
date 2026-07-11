@@ -5,15 +5,20 @@ Strategy, cheapest-correct first:
    STT), pass them through.
 2. Stereo call recordings put advisor on one channel, customer on the other →
    per-segment channel energy assigns the speaker with zero ML (left=advisor).
-3. Mono / unreadable audio → turn-based fallback (alternate speakers), returned
-   with low confidence so the call page can show a "low diarisation confidence"
-   banner. We still score what's scoreable rather than going silent.
+3. Mono → ACOUSTIC clustering: per-segment voice fingerprints (spectral envelope
+   + pitch) clustered into two speakers; advisor = call opener. Voice-based, not
+   gap-based.
+4. Only if the voices aren't acoustically separable → turn-based fallback
+   (alternate speakers) with low confidence, so the call page shows a "low
+   diarisation confidence" banner. We still score what's scoreable rather than
+   going silent. pyannote (HF token) is the documented production upgrade.
 """
 
 from __future__ import annotations
 
 import logging
 
+from transcription.acoustic import acoustic_diarise
 from transcription.base import TxSegment
 
 log = logging.getLogger("callsense.diarize")
@@ -31,6 +36,10 @@ def diarise(
         result = _channel_split(audio_uri, segments)
         if result is not None:
             return result
+    # Mono (or unsplittable stereo): cluster by VOICE before giving up.
+    acoustic = acoustic_diarise(audio_uri, segments)
+    if acoustic is not None:
+        return acoustic
     return _turn_fallback(segments), 0.5
 
 
@@ -65,8 +74,9 @@ def _channel_split(
 
     mean_sep = sum(separations) / len(separations) if separations else 0.0
     if mean_sep < _STEREO_SEPARATION_MIN:
-        # Channels barely differ -> treat as mono.
-        return _turn_fallback(segments), 0.5
+        # Channels barely differ -> effectively mono; let the caller try the
+        # acoustic (voice) path before any naive fallback.
+        return None
     return segments, round(min(1.0, 0.6 + mean_sep), 3)
 
 

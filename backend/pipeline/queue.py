@@ -13,7 +13,7 @@ Reliability properties:
   visibility timeout is re-claimable (a worker died mid-stage). Stage-level
   idempotency makes re-running safe.
 - **Backoff + jitter**: failed jobs return to `pending` with
-  `run_after = now() + base * 2**attempt * (0.5..1.5)`.
+  `run_after = clock_timestamp() + base * 2**attempt * (0.5..1.5)`.
 - **Dead-letter**: `attempts >= max_attempts` parks the job as `dead` with the
   last error, visible in the ops view and re-queueable.
 """
@@ -77,7 +77,7 @@ class PostgresJobQueue(JobQueue):
                      run_after, created_at, updated_at)
                 VALUES
                     (:call_id, :stage, 'pending', 0, :max_attempts,
-                     now(), now(), now())
+                     clock_timestamp(), clock_timestamp(), clock_timestamp())
                 ON CONFLICT (call_id, stage) DO NOTHING
                 """
             ),
@@ -90,15 +90,15 @@ class PostgresJobQueue(JobQueue):
                 """
                 WITH claimed AS (
                     SELECT id FROM processing_jobs
-                    WHERE (status = 'pending' AND run_after <= now())
+                    WHERE (status = 'pending' AND run_after <= clock_timestamp())
                        OR (status = 'running'
-                           AND updated_at < now() - make_interval(secs => :vis))
+                           AND updated_at < clock_timestamp() - make_interval(secs => :vis))
                     ORDER BY run_after
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED
                 )
                 UPDATE processing_jobs j
-                SET status = 'running', attempts = j.attempts + 1, updated_at = now()
+                SET status = 'running', attempts = j.attempts + 1, updated_at = clock_timestamp()
                 FROM claimed
                 WHERE j.id = claimed.id
                 RETURNING j.id, j.call_id, j.stage, j.attempts, j.max_attempts
@@ -120,7 +120,7 @@ class PostgresJobQueue(JobQueue):
         session.execute(
             text(
                 "UPDATE processing_jobs SET status='done', last_error=NULL, "
-                "updated_at=now() WHERE id=:id"
+                "updated_at=clock_timestamp() WHERE id=:id"
             ),
             {"id": job_id},
         )
@@ -137,7 +137,7 @@ class PostgresJobQueue(JobQueue):
             session.execute(
                 text(
                     "UPDATE processing_jobs SET status='dead', last_error=:err, "
-                    "updated_at=now() WHERE id=:id"
+                    "updated_at=clock_timestamp() WHERE id=:id"
                 ),
                 {"id": job.id, "err": error[:2000]},
             )
@@ -145,8 +145,8 @@ class PostgresJobQueue(JobQueue):
             session.execute(
                 text(
                     "UPDATE processing_jobs SET status='pending', last_error=:err, "
-                    "run_after = now() + make_interval(secs => :delay), "
-                    "updated_at=now() WHERE id=:id"
+                    "run_after = clock_timestamp() + make_interval(secs => :delay), "
+                    "updated_at=clock_timestamp() WHERE id=:id"
                 ),
                 {"id": job.id, "err": error[:2000], "delay": backoff_seconds(job.attempts)},
             )

@@ -56,7 +56,12 @@ def run(session: Session, call_id: int) -> None:
     prompt_hash = hashlib.sha256(
         (SYSTEM + build_analysis_user_prompt(transcript, calibration)).encode()
     ).hexdigest()
-    model_name = "mock" if settings.mock_mode else settings.llm_model
+    if settings.mock_mode:
+        model_name = "mock"
+    elif settings.llm_provider == "anthropic" and settings.anthropic_api_key:
+        model_name = settings.llm_model
+    else:
+        model_name = settings.gemini_model
 
     # --- Dimension scores -------------------------------------------------
     dim_scores: dict = {}
