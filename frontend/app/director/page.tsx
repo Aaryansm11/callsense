@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { TeamBars, TrendLine } from "@/components/charts";
 import { UploadCall } from "@/components/UploadCall";
+import { API_BASE } from "@/lib/api";
 import { Badge, Card, CardBody, Empty, KpiCard, SectionTitle, Skeleton } from "@/components/ui";
 import { prettyDate, prettyTag, round, scoreColor } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
@@ -13,7 +14,14 @@ export default function DirectorPage() {
 
   if (loading) return <LoadingGrid />;
   if (error || !data)
-    return <Empty>Couldn&apos;t load org summary. Is the API running on :8000? {error}</Empty>;
+    return (
+      <Empty>
+        Couldn&apos;t reach the API this build points at: <b>{API_BASE}</b>.
+        {API_BASE.includes("localhost") &&
+          " (NEXT_PUBLIC_API_URL wasn't set at build time — set it in Vercel and redeploy.)"}{" "}
+        {error}
+      </Empty>
+    );
 
   const { org, kpis, teams, trend, risk_feed } = data;
   const trendData = trend.map((t) => ({ label: prettyDate(t.day), value: Number(t.avg_composite) }));
