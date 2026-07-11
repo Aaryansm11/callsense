@@ -25,6 +25,11 @@ if _backend.exists():  # local repo layout
     sys.path.insert(0, str(_backend))
 # else: running in the backend container where modules are already importable.
 
+# Seed data is synthetic tone-audio with fixture-driven analyses; it must NEVER
+# hit real Whisper/LLM even if the deployment runs in real mode. Set before any
+# backend import so the cached Settings picks it up.
+os.environ["MOCK_MODE"] = "true"
+
 from sqlalchemy import text  # noqa: E402
 
 from db.session import SessionLocal  # noqa: E402

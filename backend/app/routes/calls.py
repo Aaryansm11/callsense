@@ -110,10 +110,21 @@ def call_detail(call_id: int, db: Session = Depends(get_db)) -> dict:
         {"id": call_id},
     ).mappings().all()
 
+    # Pipeline progress — lets the UI show stages ticking while a real call is
+    # being transcribed/analysed in the background worker.
+    jobs = db.execute(
+        text(
+            "SELECT stage, status, attempts, last_error FROM processing_jobs "
+            "WHERE call_id = :id ORDER BY id"
+        ),
+        {"id": call_id},
+    ).mappings().all()
+
     return {
         "call": dict(call),
         "transcript": dict(transcript) if transcript else None,
         "segments": [dict(s) for s in segments],
         "scores": [dict(s) for s in scores],
         "flags": [dict(f) for f in flags],
+        "jobs": [dict(j) for j in jobs],
     }

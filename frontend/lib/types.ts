@@ -44,6 +44,13 @@ export interface Flag {
   state: "open" | "disputed" | "upheld" | "dismissed";
 }
 
+export interface Job {
+  stage: string;
+  status: "pending" | "running" | "done" | "failed" | "dead";
+  attempts: number;
+  last_error: string | null;
+}
+
 export interface CallDetail {
   call: {
     id: number;
@@ -71,6 +78,7 @@ export interface CallDetail {
   segments: Segment[];
   scores: Score[];
   flags: Flag[];
+  jobs: Job[];
 }
 
 export interface OrgSummary {

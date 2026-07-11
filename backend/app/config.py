@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     # --- Analysis / LLM (used from Phase 4+) -----------------------------
     # MOCK_MODE=true runs the whole loop with canned fixtures and zero network
     # so graders without API keys still see the full system work.
-    mock_mode: bool = True
+    mock_mode: bool = False
     llm_provider: str = "gemini"  # mock | gemini | anthropic (used when mock_mode=false)
     llm_temperature: float = 0.0
 

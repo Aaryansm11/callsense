@@ -30,3 +30,15 @@ def test_absent_quote_is_dropped():
 
 def test_empty_quote_not_found():
     assert not verify_quote("", _segments()).found
+
+
+def test_devanagari_quote_matches():
+    # Real Whisper renders Hinglish in Devanagari; the gate must still verify.
+    segs = [TxSegment(0, 0.0, 5.0, "सर इस प्रोग्राम के बाद वेट लोस बिलकुल गारेंटीड है")]
+    m = verify_quote("वेट लोस बिलकुल गारेंटीड है", segs)
+    assert m.found and m.start_s == 0.0
+
+
+def test_devanagari_absent_quote_dropped():
+    segs = [TxSegment(0, 0.0, 5.0, "सर इस प्रोग्राम के बाद वेट लोस बिलकुल गारेंटीड है")]
+    assert not verify_quote("हम आपको मुफ्त लैपटॉप देंगे", segs).found

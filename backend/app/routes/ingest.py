@@ -29,8 +29,13 @@ async def upload(
     db: Session = Depends(get_db),
     queue=Depends(get_queue),
 ) -> IngestResponse:
+    settings = get_settings()
     content = await file.read()
-    adapter = RestAdapter(get_settings().audio_storage_dir)
+    adapter = RestAdapter(settings.audio_storage_dir)
+    # A fixture name only means something in MOCK_MODE; in real mode the actual
+    # audio is transcribed (faster-whisper) and judged (LLM) — ignore it so a
+    # stale UI param can't mislabel a real call.
+    fixture = fixture if settings.mock_mode else None
     env = adapter.build(
         filename=file.filename or "upload.wav",
         content=content,
@@ -41,8 +46,10 @@ async def upload(
     result = ingest(db, env, queue)
     db.commit()
 
+    # Inline drain is instant with mocks; with real Whisper+LLM it would block
+    # this request for minutes — the worker service owns processing there.
     processed = False
-    if process and result.created:
+    if process and result.created and settings.mock_mode:
         worker.run_until_idle(queue)
         processed = True
 

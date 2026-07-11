@@ -16,11 +16,15 @@ from difflib import SequenceMatcher
 from transcription.base import TxSegment
 
 DEFAULT_THRESHOLD = 0.85
-_NORM = re.compile(r"[^a-z0-9 ]+")
+# Unicode-aware: keep word characters from ANY script (real Whisper renders
+# Hinglish in Devanagari — an ASCII-only normaliser would empty those quotes
+# and silently drop every valid flag). \w matches Devanagari etc. by default.
+_NORM = re.compile(r"[^\w\s]+", re.UNICODE)
+_WS = re.compile(r"\s+")
 
 
 def _normalise(s: str) -> str:
-    return _NORM.sub(" ", s.lower()).strip()
+    return _WS.sub(" ", _NORM.sub(" ", s.lower())).strip()
 
 
 @dataclass
