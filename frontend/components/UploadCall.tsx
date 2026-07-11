@@ -52,8 +52,19 @@ export function UploadCall() {
         form.append("process", "true"); // instant with mocks
       }
       const res = await uploadCall(form);
-      if (res.call_id) {
+      if (res.call_id && res.created === false) {
+        // Idempotency: this exact audio was ingested before — we never process
+        // the same recording twice. Say so instead of silently redirecting.
+        setMsg(
+          `⚠ This exact audio was already ingested as call #${res.call_id} ` +
+            `(idempotency guard — same bytes are never processed twice). ` +
+            `Opening the existing call… upload a different recording to see a fresh run.`
+        );
+        setTimeout(() => router.push(`/calls/${res.call_id}`), 3500);
+      } else if (res.call_id) {
         router.push(`/calls/${res.call_id}`);
+      } else if (res.accepted === false) {
+        setMsg(`Rejected: ${res.reason ?? "invalid audio"}`);
       } else {
         setMsg(`Result: ${JSON.stringify(res)}`);
       }
