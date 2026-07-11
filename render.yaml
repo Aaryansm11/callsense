@@ -1,0 +1,32 @@
+# Render blueprint — deploys the CallSense API (with inline worker thread) from
+# the repo's Dockerfile. Pair with: Neon (free Postgres) + Vercel (frontend).
+# See DEPLOYMENT.md for the full step-by-step.
+#
+# Secrets (DATABASE_URL, GEMINI_API_KEY) are set in the Render dashboard —
+# never committed. sync: false marks them as dashboard-managed.
+
+services:
+  - type: web
+    name: callsense-api
+    runtime: docker
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    plan: free            # 512MB RAM: runs the full loop in MOCK_MODE.
+                          # For REAL Whisper+LLM in the cloud use `starter` (2GB+)
+                          # and set MOCK_MODE=false below.
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL          # postgresql+psycopg://... from Neon
+        sync: false
+      - key: GEMINI_API_KEY        # only used when MOCK_MODE=false
+        sync: false
+      - key: MOCK_MODE
+        value: "true"
+      - key: RUN_INLINE_WORKER     # no separate worker service on the free plan
+        value: "true"
+      - key: ENVIRONMENT
+        value: prod
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: GEMINI_MODEL
+        value: gemini-flash-lite-latest

@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { PipelineStepper } from "@/components/PipelineStepper";
 import { Badge, Button, Card, CardBody, Empty, SectionTitle, Skeleton } from "@/components/ui";
 import { API_BASE, api } from "@/lib/api";
 import { mmss, prettyTag, round, scoreBg, severityStyle, stateStyle } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
-import type { CallDetail, Flag, Job } from "@/lib/types";
+import type { CallDetail, Flag } from "@/lib/types";
 
 const DIM_LABEL: Record<string, string> = {
   needs_discovery: "Needs discovery",
@@ -102,8 +103,14 @@ function CallInner({ id }: { id: number }) {
         </div>
       </div>
 
-      {(processing || data.jobs.some((j) => j.status === "failed" || j.status === "dead")) && (
-        <PipelineProgress jobs={data.jobs} processing={processing} />
+      {(processing ||
+        data.jobs.some((j) => j.status === "failed" || j.status === "dead") ||
+        (data.call.composite == null && data.jobs.length > 0)) && (
+        <PipelineStepper
+          jobs={data.jobs}
+          processing={processing}
+          callDone={data.call.status === "done"}
+        />
       )}
 
       {diar < 0.7 && !processing && (
@@ -266,56 +273,6 @@ function CallInner({ id }: { id: number }) {
           </Card>
         </div>
       </div>
-    </div>
-  );
-}
-
-const STAGE_ORDER = ["transcribe", "diarise", "redact", "classify", "analyse", "validate"];
-
-function PipelineProgress({ jobs, processing }: { jobs: Job[]; processing: boolean }) {
-  const byStage: Record<string, Job> = {};
-  for (const j of jobs) byStage[j.stage] = j;
-  const failed = jobs.find((j) => j.status === "failed" || j.status === "dead");
-  return (
-    <div className="rounded-lg border border-border bg-white px-4 py-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-xs font-semibold uppercase tracking-wide text-muted">
-          Pipeline
-        </span>
-        {STAGE_ORDER.map((stage) => {
-          const j = byStage[stage];
-          const status = j?.status ?? "queued";
-          const style =
-            status === "done"
-              ? "bg-green-50 text-ok border-green-200"
-              : status === "running"
-                ? "bg-brand-soft text-brand border-indigo-200 animate-pulse"
-                : status === "failed" || status === "dead"
-                  ? "bg-red-50 text-crit border-red-200"
-                  : "bg-gray-50 text-muted border-border";
-          const icon =
-            status === "done" ? "✓" : status === "running" ? "●" : status === "failed" || status === "dead" ? "✕" : "○";
-          return (
-            <span
-              key={stage}
-              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium ${style}`}
-            >
-              {icon} {stage}
-              {j && j.attempts > 1 && <span className="text-[10px]">(try {j.attempts})</span>}
-            </span>
-          );
-        })}
-        {processing && (
-          <span className="ml-auto text-xs text-muted">
-            live — updates every 2.5s
-          </span>
-        )}
-      </div>
-      {failed && (
-        <p className="mt-2 text-xs text-crit">
-          {failed.stage} {failed.status}: {failed.last_error?.slice(0, 200)}
-        </p>
-      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { Dumbbell } from "lucide-react";
+import { BookOpen, Dumbbell } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,12 +12,12 @@ const ROLES = [
 
 export function Header() {
   const pathname = usePathname();
-  const active =
-    ROLES.find((r) => pathname.startsWith(r.href))?.key ?? "director";
+  const active = ROLES.find((r) => pathname.startsWith(r.href))?.key;
+  const onAbout = pathname.startsWith("/about");
 
   return (
-    <header className="sticky top-0 z-20 border-b border-border bg-white/80 backdrop-blur">
-      <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-3">
+    <header className="sticky top-0 z-20 border-b border-border bg-white/85 backdrop-blur">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-6 py-3">
         <Link href="/director" className="flex items-center gap-2.5">
           {/* SkilloVilla brand mark + a dumbbell badge for the fitness domain */}
           <span className="relative inline-block">
@@ -35,12 +35,25 @@ export function Header() {
           <div className="leading-tight">
             <div className="text-sm font-semibold text-ink">CallSense</div>
             <div className="text-[11px] text-muted">
-              SkilloVilla · Sales-Call Intelligence
+              FitNova · Sales-Call Intelligence
             </div>
           </div>
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/about"
+            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition ${
+              onAbout
+                ? "bg-brand-soft text-brand"
+                : "text-muted hover:bg-gray-50 hover:text-ink"
+            }`}
+          >
+            <BookOpen size={13} /> How it works
+          </Link>
+
+          <span className="hidden h-5 w-px bg-border sm:inline-block" />
+
           <span className="hidden text-xs text-muted sm:inline">Viewing as</span>
           <nav className="flex rounded-lg border border-border bg-gray-50 p-0.5">
             {ROLES.map((r) => (

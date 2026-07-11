@@ -39,6 +39,10 @@ class Settings(BaseSettings):
     worker_poll_interval_s: float = 2.0
     job_max_attempts: int = 3
     job_backoff_base_s: float = 2.0
+    # Run the worker loop as a daemon thread inside the API process. For
+    # single-container deployments (e.g. Render's free tier has no separate
+    # worker service). Compose/local keep it false and run a real worker.
+    run_inline_worker: bool = False
 
     # --- Analysis / LLM (used from Phase 4+) -----------------------------
     # MOCK_MODE=true runs the whole loop with canned fixtures and zero network

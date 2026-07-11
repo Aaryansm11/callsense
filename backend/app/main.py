@@ -47,6 +47,21 @@ for _router in (ingest.router, calls.router, summaries.router,
     app.include_router(_router)
 
 
+@app.on_event("startup")
+def _maybe_start_inline_worker() -> None:
+    """Single-container deployments (Render free tier) run the worker as a
+    daemon thread. Local/compose keep a dedicated worker process instead."""
+    if not settings.run_inline_worker:
+        return
+    import threading
+
+    from pipeline import worker as pipeline_worker
+
+    t = threading.Thread(target=pipeline_worker.main, name="inline-worker", daemon=True)
+    t.start()
+    log.info("inline worker thread started")
+
+
 @app.get("/", tags=["meta"])
 def root() -> dict:
     return {

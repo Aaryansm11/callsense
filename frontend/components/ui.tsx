@@ -98,6 +98,7 @@ export function Button({
   size = "md",
   disabled,
   type = "button",
+  className = "",
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -105,22 +106,27 @@ export function Button({
   size?: "sm" | "md";
   disabled?: boolean;
   type?: "button" | "submit";
+  className?: string;
 }) {
   const base =
-    "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed";
+    "inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:opacity-50 disabled:cursor-not-allowed";
   const sizes = size === "sm" ? "px-2.5 py-1 text-xs" : "px-3.5 py-2 text-sm";
   const variants = {
-    primary: "bg-brand text-white hover:bg-indigo-700",
+    primary: "bg-brand text-white shadow-sm hover:bg-indigo-700",
     ghost: "border border-border bg-white text-ink hover:bg-gray-50",
-    danger: "bg-crit text-white hover:bg-red-700",
-    ok: "bg-ok text-white hover:bg-green-700",
+    danger: "bg-crit text-white shadow-sm hover:bg-red-700",
+    ok: "bg-ok text-white shadow-sm hover:bg-green-700",
   }[variant];
   return (
     <button
       type={type}
-      onClick={onClick}
+      onClick={(e) => {
+        // Buttons inside the clickable dropzone must not re-trigger it.
+        e.stopPropagation();
+        onClick?.();
+      }}
       disabled={disabled}
-      className={`${base} ${sizes} ${variants}`}
+      className={`${base} ${sizes} ${variants} ${className}`}
     >
       {children}
     </button>

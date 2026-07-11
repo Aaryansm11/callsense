@@ -1,7 +1,8 @@
 "use client";
 
+import { CheckCircle2, FileAudio, Loader2, UploadCloud, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, uploadCall } from "@/lib/api";
 import { Button } from "./ui";
 
@@ -15,12 +16,19 @@ const FIXTURES = [
   { value: "non_sales", label: "Non-sales (wrong number)" },
 ];
 
+function prettySize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
 export function UploadCall() {
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const [fixture, setFixture] = useState("over_promiser");
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
+  const [msg, setMsg] = useState<{ kind: "info" | "warn" | "error"; text: string } | null>(null);
   // null = unknown (loading); true = canned fixtures; false = real Whisper+LLM
   const [mockMode, setMockMode] = useState<boolean | null>(null);
 
@@ -31,18 +39,28 @@ export function UploadCall() {
       .catch(() => setMockMode(null));
   }, []);
 
+  const pick = useCallback((f: File | undefined | null) => {
+    if (!f) return;
+    if (!f.type.startsWith("audio/") && !/\.(wav|mp3|m4a|flac|ogg|opus)$/i.test(f.name)) {
+      setMsg({ kind: "error", text: "That doesn't look like an audio file." });
+      return;
+    }
+    setFile(f);
+    setMsg(null);
+  }, []);
+
   async function submit() {
-    const file = fileRef.current?.files?.[0];
     if (!file) {
-      setMsg("Choose an audio file first.");
+      setMsg({ kind: "warn", text: "Choose an audio file first." });
       return;
     }
     setBusy(true);
-    setMsg(
-      mockMode
-        ? "Ingesting → transcribe → diarise → redact → classify → analyse …"
-        : "Uploading… you'll land on the call page and watch the pipeline run."
-    );
+    setMsg({
+      kind: "info",
+      text: mockMode
+        ? "Running the pipeline on canned analysis…"
+        : "Uploading — you'll land on the call page and watch each stage run live.",
+    });
     try {
       const form = new FormData();
       form.append("file", file);
@@ -53,65 +71,150 @@ export function UploadCall() {
       }
       const res = await uploadCall(form);
       if (res.call_id && res.created === false) {
-        // Idempotency: this exact audio was ingested before — we never process
-        // the same recording twice. Say so instead of silently redirecting.
-        setMsg(
-          `⚠ This exact audio was already ingested as call #${res.call_id} ` +
-            `(idempotency guard — same bytes are never processed twice). ` +
-            `Opening the existing call… upload a different recording to see a fresh run.`
-        );
-        setTimeout(() => router.push(`/calls/${res.call_id}`), 3500);
+        setMsg({
+          kind: "warn",
+          text:
+            `This exact audio was already ingested as call #${res.call_id} — the ` +
+            `idempotency guard never processes the same bytes twice. Opening the ` +
+            `existing call…`,
+        });
+        setTimeout(() => router.push(`/calls/${res.call_id}`), 3000);
       } else if (res.call_id) {
         router.push(`/calls/${res.call_id}`);
       } else if (res.accepted === false) {
-        setMsg(`Rejected: ${res.reason ?? "invalid audio"}`);
-      } else {
-        setMsg(`Result: ${JSON.stringify(res)}`);
+        setMsg({ kind: "error", text: `Rejected: ${res.reason ?? "invalid audio"}` });
+        setBusy(false);
       }
     } catch (e) {
-      setMsg(`Upload failed: ${e}`);
-    } finally {
+      setMsg({ kind: "error", text: `Upload failed: ${e}` });
       setBusy(false);
     }
   }
 
   return (
     <div className="space-y-3">
+      {/* Mode banner */}
       {mockMode === false ? (
-        <div className="rounded-md border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs text-green-800">
-          <b>REAL mode</b> — your audio is transcribed by faster-whisper and
-          judged by Gemini. Processing takes a minute or two; the call page
-          shows each pipeline stage live.
+        <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-800">
+          <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
+          <span>
+            <b>Real analysis mode.</b> Your audio is transcribed locally by
+            faster-whisper and judged by Gemini. Expect 1–3 minutes; the call
+            page shows every pipeline stage live.
+          </span>
         </div>
-      ) : (
-        <p className="text-xs text-muted">
-          Drop any audio file — in MOCK_MODE the analysis follows the chosen
-          scenario so the full loop runs with no API key.
+      ) : mockMode === true ? (
+        <div className="rounded-lg border border-border bg-gray-50 px-3 py-2 text-xs text-muted">
+          <b>Demo mode.</b> Any audio runs the full loop with the canned scenario
+          you pick below — no API keys needed.
+        </div>
+      ) : null}
+
+      {/* Dropzone */}
+      <div
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOver(false);
+          pick(e.dataTransfer.files?.[0]);
+        }}
+        onClick={() => inputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" && inputRef.current?.click()}
+        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-7 text-center transition ${
+          dragOver
+            ? "border-brand bg-brand-soft"
+            : "border-border bg-gray-50/60 hover:border-brand/60 hover:bg-brand-soft/40"
+        }`}
+      >
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft text-brand">
+          <UploadCloud size={20} />
+        </span>
+        <p className="text-sm font-medium text-ink">
+          Drag &amp; drop a call recording
+        </p>
+        <p className="text-xs text-muted">WAV, MP3, M4A, FLAC, OGG · or</p>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => inputRef.current?.click()}
+        >
+          Browse files
+        </Button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="audio/*,.wav,.mp3,.m4a,.flac,.ogg,.opus"
+          className="hidden"
+          onChange={(e) => pick(e.target.files?.[0])}
+        />
+      </div>
+
+      {/* Selected file chip */}
+      {file && (
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-white px-3 py-2">
+          <FileAudio size={16} className="shrink-0 text-brand" />
+          <span className="min-w-0 flex-1 truncate text-sm font-medium">{file.name}</span>
+          <span className="shrink-0 text-xs text-muted">{prettySize(file.size)}</span>
+          <button
+            onClick={() => {
+              setFile(null);
+              if (inputRef.current) inputRef.current.value = "";
+            }}
+            className="shrink-0 rounded p-0.5 text-muted hover:bg-gray-100 hover:text-ink"
+            aria-label="Remove file"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Scenario picker (mock mode only) */}
+      {mockMode !== false && (
+        <label className="block text-xs text-muted">
+          Demo scenario
+          <select
+            value={fixture}
+            onChange={(e) => setFixture(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-white px-2.5 py-2 text-xs text-ink"
+          >
+            {FIXTURES.map((f) => (
+              <option key={f.value} value={f.value}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      <Button onClick={submit} disabled={busy || !file} className="w-full">
+        {busy ? (
+          <>
+            <Loader2 size={15} className="animate-spin" /> Processing…
+          </>
+        ) : (
+          "Ingest & analyse call"
+        )}
+      </Button>
+
+      {msg && (
+        <p
+          className={`text-xs leading-relaxed ${
+            msg.kind === "error"
+              ? "text-crit"
+              : msg.kind === "warn"
+                ? "text-warn"
+                : "text-muted"
+          }`}
+        >
+          {msg.text}
         </p>
       )}
-      <input
-        ref={fileRef}
-        type="file"
-        accept="audio/*"
-        className="block w-full text-xs file:mr-3 file:rounded-md file:border-0 file:bg-brand-soft file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-brand"
-      />
-      {mockMode !== false && (
-        <select
-          value={fixture}
-          onChange={(e) => setFixture(e.target.value)}
-          className="w-full rounded-lg border border-border bg-white px-2.5 py-1.5 text-xs"
-        >
-          {FIXTURES.map((f) => (
-            <option key={f.value} value={f.value}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-      )}
-      <Button onClick={submit} disabled={busy}>
-        {busy ? "Uploading…" : "Ingest & analyse"}
-      </Button>
-      {msg && <p className="text-xs text-muted">{msg}</p>}
     </div>
   );
 }
