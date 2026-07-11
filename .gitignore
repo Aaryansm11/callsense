@@ -34,3 +34,6 @@ frontend/.env*.local
 Thumbs.db
 .idea/
 .vscode/
+
+# API-relative audio store (uploads land here when the API runs from backend/)
+backend/demo/audio/

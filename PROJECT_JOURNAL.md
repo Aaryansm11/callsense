@@ -192,3 +192,241 @@ Auth/SSO (role switcher demonstrates authorization instead), live telephony
 acoustic clustering + documented upgrade path), fine-tuning (the dispute loop
 is generating its future training set), golden-set `make eval` (documented
 roadmap), Kubernetes/Kafka (scale honesty).
+
+---
+
+## 8. Complete changelog — every commit, with rationale and files
+
+### `402f364` — Initial end-to-end system
+**Why:** the whole MVP loop built and verified locally before any polish
+(the brief grades a working prototype above all).
+**What:** schema + Alembic migrations ([backend/db/models.py](backend/db/models.py),
+[backend/db/alembic/versions/](backend/db/alembic/versions/),
+[backend/db/views.sql](backend/db/views.sql)); SKIP-LOCKED queue + worker
+([backend/pipeline/queue.py](backend/pipeline/queue.py),
+[backend/pipeline/worker.py](backend/pipeline/worker.py)); six stages
+([backend/pipeline/stages/](backend/pipeline/stages/)); adapters + ffprobe gate +
+idempotent ingest ([backend/ingestion/](backend/ingestion/)); Whisper/mock
+transcribers + channel-split diarisation ([backend/transcription/](backend/transcription/));
+rubric, quote gate, redaction, LLM interface
+([backend/analysis/](backend/analysis/)); FastAPI routes
+([backend/app/routes/](backend/app/routes/)); dispute→recompute→calibration
+([backend/feedback.py](backend/feedback.py),
+[backend/analysis/recompute.py](backend/analysis/recompute.py)); Next.js
+dashboards ([frontend/app/](frontend/app/)); seed
+([demo/seed.py](demo/seed.py)); compose/Makefile; 28 tests
+([backend/tests/](backend/tests/)). SkilloVilla logo fetched into
+[frontend/public/](frontend/public/).
+
+### `564c1fc` — FitNova reframe
+**Why:** the actual PDF brief is about FitNova (fitness), not edtech; graders
+grade against their brief. **What:** all fixtures/prompt anchors reworded to
+fitness mis-selling ([backend/fixtures.py](backend/fixtures.py),
+[backend/analysis/prompts.py](backend/analysis/prompts.py)); dumbbell badge on
+the logo ([frontend/components/Header.tsx](frontend/components/Header.tsx));
+seed org renamed ([demo/seed.py](demo/seed.py)); the PDF itself committed.
+
+### `a38501e` — Gemini as the real LLM provider
+**Why:** no Anthropic key available; user has a Google AI Studio key. Free-tier
+reality discovered live: `gemini-2.5-flash` is gated for new keys and flash/pro
+quotas 429 quickly → default `gemini-flash-lite-latest`. **What:** `GeminiLLM`
+with a process-wide 1 rps throttle + exponential backoff on 429/503, provider
+factory ([backend/analysis/llm.py](backend/analysis/llm.py)); provider config
+([backend/app/config.py](backend/app/config.py), [.env.example](.env.example));
+`google-genai` pinned ([backend/requirements.txt](backend/requirements.txt)).
+
+### `032bb66` — Real-mode frontend testing
+**Why (bug):** the quote-gate normaliser was ASCII-only; real Whisper writes
+Hinglish in **Devanagari**, so every real flag would have been dropped
+silently. Also: inline processing would freeze the browser for minutes, and
+the fixture param could mislabel real calls. **What:** Unicode-aware
+normalisation + Devanagari tests
+([backend/analysis/verify.py](backend/analysis/verify.py),
+[backend/tests/unit/test_quote_gate.py](backend/tests/unit/test_quote_gate.py));
+real-mode uploads return instantly, worker owns processing, fixture ignored in
+real mode ([backend/app/routes/ingest.py](backend/app/routes/ingest.py));
+pipeline `jobs` exposed in call detail
+([backend/app/routes/calls.py](backend/app/routes/calls.py)); call page polls
+every 2.5 s with live stage chips
+([frontend/app/calls/[id]/page.tsx](frontend/app/calls/[id]/page.tsx)); seed
+forces MOCK_MODE ([demo/seed.py](demo/seed.py)).
+
+### `6906ef2` — Idempotency dedupe UX
+**Why (bug):** re-uploading previously-ingested bytes silently opened the old
+(mock-era) call — user saw "dummy analysis" and rightly cried foul. **What:**
+explicit "already ingested as call #N" banner
+([frontend/components/UploadCall.tsx](frontend/components/UploadCall.tsx)).
+
+### `ff234a7` — Voice-based mono diarisation + honest timings
+**Why:** the mono fallback alternated speakers at pauses — mislabels anyone who
+talks twice in a row; user demanded voice-based separation. Also job timings
+looked impossible (Postgres `now()` freezes at transaction start while stages
+run inside the txn). **What:** numpy-only acoustic diariser — per-segment
+log-mel + pitch fingerprints, deterministic 2-means, separation-based
+confidence, honest `None` when voices aren't separable
+([backend/transcription/acoustic.py](backend/transcription/acoustic.py),
+wired in [backend/transcription/diarize.py](backend/transcription/diarize.py),
+tests [backend/tests/unit/test_acoustic_diarise.py](backend/tests/unit/test_acoustic_diarise.py));
+queue timestamps switched to `clock_timestamp()`
+([backend/pipeline/queue.py](backend/pipeline/queue.py)).
+
+### `a494de0` — Test calls, talk-ratio, CI, packaging
+**Why:** user needed uploadable recordings; `talk_over_customer` existed as a
+tag but nothing measured it (LLMs shouldn't do arithmetic); CI was promised in
+the plan; `numpy`/`soundfile` were imported but never pinned (Docker/CI would
+crash). **What:** TTS test-call generator, stereo+mono variants
+([demo/make_test_calls.py](demo/make_test_calls.py)); deterministic talk-ratio
+flag ([backend/analysis/metrics.py](backend/analysis/metrics.py), wired in
+[backend/pipeline/stages/analyse.py](backend/pipeline/stages/analyse.py));
+GitHub Actions with a postgres:16 service
+([.github/workflows/ci.yml](.github/workflows/ci.yml)); requirements fixed +
+real-mode extras split ([backend/requirements.txt](backend/requirements.txt),
+[backend/requirements-real.txt](backend/requirements-real.txt)).
+
+### `987eb28` — UI revamp, About page, hardening, deployment blueprint
+**Why:** upload had no explicit button ("you just randomly click"), progress UI
+was weak, the app "looked like a school project"; the public endpoint needed
+abuse protection; deployment needed a paved path. **What:** drag-&-drop upload
+with Browse button/file chip/status banners
+([frontend/components/UploadCall.tsx](frontend/components/UploadCall.tsx));
+professional pipeline stepper
+([frontend/components/PipelineStepper.tsx](frontend/components/PipelineStepper.tsx));
+"How it works" explainer page ([frontend/app/about/page.tsx](frontend/app/about/page.tsx));
+header nav ([frontend/components/Header.tsx](frontend/components/Header.tsx));
+200 MB upload cap + 10/min/IP sliding-window rate limiter
+([backend/app/ratelimit.py](backend/app/ratelimit.py),
+[backend/app/routes/ingest.py](backend/app/routes/ingest.py)); inline-worker
+mode for single-container hosts ([backend/app/main.py](backend/app/main.py),
+[backend/app/config.py](backend/app/config.py)); Render blueprint
+([render.yaml](render.yaml)); [DEPLOYMENT.md](DEPLOYMENT.md).
+
+### `f30ca53` — HF Space attempt + CI fix
+**Why (CI bug):** `python-multipart` was installed locally but never pinned —
+first CI run red. **Why (deploy):** HF Spaces free tier (16 GB) was the pick
+for real-mode cloud… and turned out to be PRO-gated for Docker at deploy time.
+**What:** requirement pinned ([backend/requirements.txt](backend/requirements.txt));
+Space image with baked Whisper model ([Dockerfile](Dockerfile)); `SEED_MODE`
+always/if-empty ([demo/seed.py](demo/seed.py)); one-command Space deploy script
+([scripts/deploy_hf_space.ps1](scripts/deploy_hf_space.ps1)) — kept for anyone
+with HF PRO.
+
+### `86941b6` — Railway deployment
+**Why:** the free host that actually worked (trial: $5 credit, no card;
+1 GB RAM → cloud runs Whisper `base`, local keeps `small`). **What:**
+[.railwayignore](.railwayignore) (keeps `.env`/audio/junk out of CLI uploads);
+[DEPLOYMENT.md](DEPLOYMENT.md) rewritten to the deployed reality.
+
+### `6f86eca` — Diagnostic error state
+**Why:** the deployed frontend said "Is the API running on :8000?" — useless in
+prod; the real cause was `NEXT_PUBLIC_API_URL` not baked at build time.
+**What:** the error now prints exactly which API base the build contains
+([frontend/app/director/page.tsx](frontend/app/director/page.tsx)).
+
+### `2c1e90f` — Empty commit, corrected author
+**Why:** Vercel Hobby **blocks** deployments from commit authors who aren't
+project members on private repos; commits were authored with an email not
+registered to the GitHub account. Author switched to
+`Aaryansm11@users.noreply.github.com` for all future commits.
+
+### `7aabf3d` — Live links in README ([README.md](README.md)).
+
+### `3853635` — Same-origin API proxy (the ISP fix)
+**Why (bug):** the live site failed on the user's networks (desktop *and*
+mobile). Diagnosis: Google/Cloudflare/Quad9/OpenDNS all resolve the API domain;
+the user's ISP resolver returns **REFUSED** — Indian ISPs block
+`*.up.railway.app` DNS wholesale. **What:** Next.js rewrite
+`/api/backend/:path* → Railway` so browsers only ever resolve `vercel.app` and
+Vercel's edge (outside Indian ISPs) relays to Railway
+([frontend/next.config.mjs](frontend/next.config.mjs)); the client auto-uses
+the proxy on `*.vercel.app` ([frontend/lib/api.ts](frontend/lib/api.ts)).
+**Consequence documented below:** uploads through the proxy inherit Vercel's
+~4.5 MB body limit.
+
+### `9c39cf6` — Fixes from live real-call testing
+**Why (three user-caught issues):** (1) cloud transcript came out in Urdu
+script — Hindi/Urdu are one spoken language and un-hinted smaller Whisper
+models pick the Perso-Arabic script; (2) "whoever says hello first = advisor"
+failed on a call where the victim answered first; (3) a flag was standing on a
+customer-labelled line. **What:** `language_hint` flows into Whisper
+(`language="hi"` ⇒ Devanagari) ([backend/transcription/base.py](backend/transcription/base.py),
+[backend/transcription/faster_whisper_tx.py](backend/transcription/faster_whisper_tx.py),
+[backend/pipeline/stages/transcribe.py](backend/pipeline/stages/transcribe.py),
+[backend/pipeline/stages/base.py](backend/pipeline/stages/base.py)) + upload
+language selector ([frontend/components/UploadCall.tsx](frontend/components/UploadCall.tsx),
+[backend/app/routes/ingest.py](backend/app/routes/ingest.py)); classifier
+returns a structured verdict incl. `advisor_is` and **swaps speaker labels**
+when content shows they're backwards, idempotency-guarded
+([backend/analysis/llm.py](backend/analysis/llm.py),
+[backend/analysis/prompts.py](backend/analysis/prompts.py),
+[backend/pipeline/stages/classify.py](backend/pipeline/stages/classify.py));
+scam/support/remote-access calls explicitly NON_SALES (same prompt);
+advisor-only flag policy — customer-attributed flags degrade to `info` with an
+attribution note ([backend/pipeline/stages/analyse.py](backend/pipeline/stages/analyse.py)).
+
+### `492799b` — This journal ([PROJECT_JOURNAL.md](PROJECT_JOURNAL.md)).
+
+### `95b9165` — Mixed-stereo diarisation trap
+**Why (bug, live call 26):** a stereo MP3 with both voices on both channels and
+a constant left-bias made *every* segment left-heavier → channel-split labelled
+all 30 segments "advisor" with false 0.83 confidence, and voice clustering
+never ran. **What:** channel-split now sanity-checks that BOTH speakers
+appear; one-sided results are treated as mixing artifacts and fall through to
+voice clustering ([backend/transcription/diarize.py](backend/transcription/diarize.py));
+regression test recreating the exact failure shape
+([backend/tests/unit/test_acoustic_diarise.py](backend/tests/unit/test_acoustic_diarise.py)).
+38 tests.
+
+### `193968a` — README correction: the deployed LLM is **Gemini**, not
+Anthropic (Anthropic remains a supported swap) ([README.md](README.md)).
+
+### (this commit) — Journal expansion + repo hygiene
+Untracked accidentally-committed upload audio (`backend/demo/audio/store/*.mp3`
+— uploads land under `backend/` when the API runs from that directory, which
+the root ignore didn't cover) and ignored the path going forward
+([.gitignore](.gitignore)).
+
+---
+
+## 9. Infrastructure & ops decisions that live outside commits
+
+- **Local dev without installs:** Postgres runs from the `callsense` conda env
+  (data dir `.pgdata/`, helper [scripts/localdb.ps1](scripts/localdb.ps1));
+  Node from a second env. No Docker/Node/Postgres system installs were ever
+  made on the dev machine.
+- **Neon (cloud Postgres):** project `callsense`, Singapore; migrations applied
+  from the dev machine; connection string uses the `postgresql+psycopg://`
+  prefix. Demo data is seeded **by the container at boot** — audio files are
+  regenerated on the container's own disk so playback works in the cloud (rows
+  seeded from a laptop would point at that laptop's paths).
+- **Railway:** project `callsense`, deployed via `railway up` (code upload —
+  no GitHub app needed). Gotchas hit and fixed: CLI requires an
+  **account-scoped** token (workspace tokens are rejected); Railway injects
+  `PORT=8080` while the domain targeted 7860 → pinned `PORT=7860` variable;
+  each deploy has a ~3–5 min 502 window (build + boot-seed; no zero-downtime
+  on a single container).
+- **Vercel:** Root Directory must be `frontend`; `NEXT_PUBLIC_*` vars are baked
+  at **build** time (set-then-redeploy); Deployment Protection had to be
+  disabled for production (it was serving a Vercel login wall); Hobby blocks
+  non-member commit authors on private repos (fixed via the noreply author).
+- **Upload size limits (layered):** the API accepts **200 MB**; but the live
+  site routes uploads through the **Vercel edge proxy** (the ISP-block fix),
+  which caps request bodies at **~4.5 MB** — so the practical live-demo limit
+  is ~4 minutes of MP3. Local/direct-API use keeps the full 200 MB. Rate
+  limit: 10 uploads/min/IP either way.
+- **Whisper model by environment:** cloud = `base` (Railway trial is 1 GB RAM),
+  local/video = `small` (~3.3× real-time on CPU). One env var
+  (`WHISPER_MODEL`) switches.
+- **DNS reality:** `*.up.railway.app` resolves on every major public resolver
+  but is REFUSED by some Indian ISP resolvers (desktop and mobile carriers) —
+  the reason the same-origin proxy exists at all.
+- **Repo visibility:** flipped to public (portfolio links to it); verified no
+  secrets in the tree before and after (`.env` gitignored + `.railwayignore`).
+- **Related repos updated:** portfolio
+  (`portfolio-site/src/lib/data/projects.ts` — CallSense as newest featured
+  project with GitHub + live links) and `workspace-archive`
+  (`Resumes/00-Master-Profile.md` — full CallSense entry).
+- **Secrets hygiene:** the Gemini key, Neon password, Railway tokens and an HF
+  token all transited the working chat and are scheduled for rotation; none
+  are in git. Deleted cloud rows: call 26 twice (once mock-era mislabel, once
+  the all-advisor diarisation case) so identical bytes could re-process after
+  fixes.
