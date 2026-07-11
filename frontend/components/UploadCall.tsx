@@ -27,6 +27,7 @@ export function UploadCall() {
   const [file, setFile] = useState<File | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [fixture, setFixture] = useState("over_promiser");
+  const [language, setLanguage] = useState("hi");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "info" | "warn" | "error"; text: string } | null>(null);
   // null = unknown (loading); true = canned fixtures; false = real Whisper+LLM
@@ -65,6 +66,7 @@ export function UploadCall() {
       const form = new FormData();
       form.append("file", file);
       form.append("advisor_external_id", "AGT-1");
+      if (language) form.append("language_hint", language);
       if (mockMode) {
         form.append("fixture", fixture);
         form.append("process", "true"); // instant with mocks
@@ -172,6 +174,23 @@ export function UploadCall() {
             <X size={14} />
           </button>
         </div>
+      )}
+
+      {/* Language hint: keeps Whisper's Hindi output in Devanagari and biases
+          decoding; "auto" lets the model guess (may drift scripts). */}
+      {mockMode === false && (
+        <label className="block text-xs text-muted">
+          Call language
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-white px-2.5 py-2 text-xs text-ink"
+          >
+            <option value="hi">Hinglish / Hindi (recommended)</option>
+            <option value="en">English</option>
+            <option value="">Auto-detect</option>
+          </select>
+        </label>
       )}
 
       {/* Scenario picker (mock mode only) */}

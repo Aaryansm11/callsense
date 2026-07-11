@@ -28,10 +28,18 @@ class FasterWhisperTranscriber(Transcriber):
             )
         return self._model
 
-    def transcribe(self, audio_uri: str, channels: int | None = None) -> TranscriptResult:
+    def transcribe(
+        self,
+        audio_uri: str,
+        channels: int | None = None,
+        language: str | None = None,
+    ) -> TranscriptResult:
         model = self._load()
+        # Only forward hints Whisper knows; a bad hint should degrade to
+        # auto-detect, not fail the stage.
+        lang = language if language and len(language) == 2 else None
         raw_segments, info = model.transcribe(
-            audio_uri, vad_filter=True, beam_size=5
+            audio_uri, vad_filter=True, beam_size=5, language=lang
         )
         segments: list[TxSegment] = []
         logprobs: list[float] = []

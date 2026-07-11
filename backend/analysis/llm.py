@@ -32,7 +32,10 @@ class LLM(ABC):
         """Return raw JSON text conforming to AnalysisResult."""
 
     @abstractmethod
-    def is_sales_call(self, opening_text: str) -> bool: ...
+    def classify(self, opening_text: str) -> dict:
+        """Screen the call opening. Returns {"sales": bool, "advisor_is":
+        "advisor"|"customer"} — the second field is a content-based check of the
+        diariser's role assignment (who is actually the company rep)."""
 
 
 class MockLLM(LLM):
@@ -46,8 +49,9 @@ class MockLLM(LLM):
         analysis.pop("non_sales", None)
         return json.dumps(analysis)
 
-    def is_sales_call(self, opening_text: str) -> bool:
-        return not get_fixture(self.fixture)["analysis"].get("non_sales", False)
+    def classify(self, opening_text: str) -> dict:
+        non_sales = get_fixture(self.fixture)["analysis"].get("non_sales", False)
+        return {"sales": not non_sales, "advisor_is": "advisor"}
 
 
 class AnthropicLLM(LLM):
@@ -79,15 +83,15 @@ class AnthropicLLM(LLM):
         )
         return _extract_json(msg.content[0].text)
 
-    def is_sales_call(self, opening_text: str) -> bool:
+    def classify(self, opening_text: str) -> dict:
         client = self._get_client()
         msg = client.messages.create(
             model=self.classifier_model,
-            max_tokens=8,
+            max_tokens=64,
             temperature=0.0,
             messages=[{"role": "user", "content": build_classify_prompt(opening_text)}],
         )
-        return "NON_SALES" not in msg.content[0].text.upper()
+        return _parse_classify(msg.content[0].text)
 
 
 # Process-global throttle so the many get_llm() instances a worker creates still
@@ -170,11 +174,27 @@ class GeminiLLM(LLM):
         user = build_analysis_user_prompt(transcript, calibration)
         return _extract_json(self._generate(self.model, SYSTEM, user, json_mode=True))
 
-    def is_sales_call(self, opening_text: str) -> bool:
+    def classify(self, opening_text: str) -> dict:
         out = self._generate(
-            self.classifier_model, None, build_classify_prompt(opening_text), json_mode=False
+            self.classifier_model, None, build_classify_prompt(opening_text), json_mode=True
         )
-        return "NON_SALES" not in out.upper()
+        return _parse_classify(out)
+
+
+def _parse_classify(raw: str) -> dict:
+    """Parse the classifier's JSON with safe defaults: an unparseable verdict
+    counts as sales (so a real call is never silently unscored) with roles
+    trusted as-is."""
+    try:
+        data = json.loads(_extract_json(raw))
+    except (ValueError, TypeError):
+        log.warning("classifier returned unparseable verdict: %r", raw[:120])
+        return {"sales": True, "advisor_is": "advisor"}
+    advisor_is = str(data.get("advisor_is", "advisor")).lower()
+    return {
+        "sales": bool(data.get("sales", True)),
+        "advisor_is": "customer" if advisor_is == "customer" else "advisor",
+    }
 
 
 def _extract_json(text: str) -> str:

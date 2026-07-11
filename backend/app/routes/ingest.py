@@ -35,6 +35,7 @@ async def upload(
     advisor_external_id: str | None = Form(default=None),
     org_id: int | None = Form(default=1),
     fixture: str | None = Form(default=None),
+    language_hint: str | None = Form(default=None),
     process: bool = Form(default=False),
     db: Session = Depends(get_db),
     queue=Depends(get_queue),
@@ -57,6 +58,7 @@ async def upload(
         content=content,
         advisor_external_id=advisor_external_id,
         org_id=org_id,
+        language_hint=language_hint,
         extra={"fixture": fixture} if fixture else None,
     )
     result = ingest(db, env, queue)

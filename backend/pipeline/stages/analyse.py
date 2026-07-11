@@ -101,9 +101,21 @@ def run(session: Session, call_id: int) -> None:
             continue
 
         severity = TAG_SEVERITY.get(flag.tag, FlagSeverity.info)
+        reason = flag.reason
         # Precision-over-recall: low confidence degrades to info-for-review.
         if flag.confidence < CONFIDENCE_THRESHOLD:
             severity = FlagSeverity.info
+        # Flags judge ADVISOR behaviour. If the verified quote sits on a
+        # customer-labelled segment, don't surface it as a violation — degrade
+        # to info for human review (diarisation may be wrong, so we keep it
+        # visible rather than dropping it silently).
+        speaker = _speaker_of(segments, match.segment_idx)
+        if speaker == "customer" and severity is not FlagSeverity.info:
+            severity = FlagSeverity.info
+            reason = (
+                f"{reason} [Quote is attributed to the customer — speaker "
+                "labels may be uncertain; downgraded for review.]"
+            )
         if severity is FlagSeverity.critical:
             has_critical = True
 
@@ -119,7 +131,7 @@ def run(session: Session, call_id: int) -> None:
             {
                 "cid": call_id, "tag": flag.tag.value, "sev": severity.value,
                 "st": match.start_s, "en": match.end_s, "q": flag.quote,
-                "reason": flag.reason, "conf": flag.confidence,
+                "reason": reason, "conf": flag.confidence,
                 "state": FlagState.open.value,
             },
         )
@@ -174,6 +186,15 @@ def run(session: Session, call_id: int) -> None:
         "call %s analysed: composite=%.1f%s, flags kept=%d dropped=%d",
         call_id, composite, " (capped)" if capped else "", kept, dropped,
     )
+
+
+def _speaker_of(segments, segment_idx) -> str | None:
+    if segment_idx is None:
+        return None
+    for seg in segments:
+        if seg.idx == segment_idx:
+            return seg.speaker
+    return None
 
 
 def _analyse_with_retry(llm, transcript: str, calibration: list[dict]) -> AnalysisResult:

@@ -53,6 +53,9 @@ def build_analysis_user_prompt(
         tags,
         "",
         "RULES:",
+        "- Flags judge ADVISOR behaviour only: a flag's `quote` must be an ADVISOR "
+        "utterance. Never flag something the customer said (e.g. a customer asking "
+        "'is it guaranteed?' is not a violation; the advisor promising a guarantee is).",
         "- Every dimension score and every flag MUST include a `quote` that appears "
         "VERBATIM in the transcript, in the original language. Do not paraphrase or "
         "translate quotes.",
@@ -73,9 +76,19 @@ def build_analysis_user_prompt(
 
 def build_classify_prompt(opening_text: str) -> str:
     return (
-        "Is the following the opening of a genuine SALES conversation, or a "
-        "NON-SALES call (wrong number, internal, spam)? Answer with exactly one "
-        f"word: SALES or NON_SALES.\n\n{opening_text}"
+        "You screen call-centre recordings. Reply with ONLY this JSON: "
+        '{"sales": true|false, "advisor_is": "advisor"|"customer"}\n'
+        "- sales: true ONLY for a genuine sales conversation — a company "
+        "representative pitching a product/program/membership to a prospect. "
+        "Wrong numbers, internal calls, customer support, tech support, and "
+        "fraud/scam calls (remote-access apps, moving money, refunds, OTP "
+        "harvesting) are NOT sales.\n"
+        "- advisor_is: the transcript labels one speaker 'advisor' (this should "
+        "be the company representative / the one pitching or directing the "
+        "call). If the labels look SWAPPED — the speaker labelled 'customer' is "
+        "actually the representative — answer \"customer\". Otherwise answer "
+        '"advisor".\n\n'
+        f"TRANSCRIPT OPENING:\n{opening_text}"
     )
 
 

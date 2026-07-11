@@ -16,7 +16,12 @@ class MockTranscriber(Transcriber):
     def __init__(self, fixture: str | None = None):
         self.fixture = fixture
 
-    def transcribe(self, audio_uri: str, channels: int | None = None) -> TranscriptResult:
+    def transcribe(
+        self,
+        audio_uri: str,
+        channels: int | None = None,
+        language: str | None = None,
+    ) -> TranscriptResult:
         fx = get_fixture(self.fixture)
         segments = [
             TxSegment(idx=i, start_s=s, end_s=e, text=t, speaker=sp)

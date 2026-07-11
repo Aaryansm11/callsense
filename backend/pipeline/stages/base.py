@@ -24,12 +24,13 @@ class CallInfo:
     status: str
     fixture: str | None
     raw_metadata: dict
+    language_hint: str | None = None
 
 
 def load_call(session: Session, call_id: int) -> CallInfo:
     row = session.execute(
         text(
-            "SELECT id, audio_uri, channels, status, raw_metadata "
+            "SELECT id, audio_uri, channels, status, language_hint, raw_metadata "
             "FROM calls WHERE id = :id"
         ),
         {"id": call_id},
@@ -44,6 +45,7 @@ def load_call(session: Session, call_id: int) -> CallInfo:
         status=row["status"],
         fixture=raw.get("fixture"),
         raw_metadata=raw,
+        language_hint=row["language_hint"],
     )
 
 

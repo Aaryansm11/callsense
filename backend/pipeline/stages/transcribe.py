@@ -27,7 +27,9 @@ def run(session: Session, call_id: int) -> None:
     set_call_status(session, call_id, CallStatus.processing.value)
 
     transcriber = get_transcriber(call.fixture)
-    result = transcriber.transcribe(call.audio_uri, call.channels)
+    result = transcriber.transcribe(
+        call.audio_uri, call.channels, language=call.language_hint
+    )
 
     tid = session.execute(
         text(

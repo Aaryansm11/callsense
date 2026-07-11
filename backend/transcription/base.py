@@ -31,5 +31,13 @@ class TranscriptResult:
 
 class Transcriber(ABC):
     @abstractmethod
-    def transcribe(self, audio_uri: str, channels: int | None = None) -> TranscriptResult:
+    def transcribe(
+        self,
+        audio_uri: str,
+        channels: int | None = None,
+        language: str | None = None,
+    ) -> TranscriptResult:
+        """`language` (ISO 639-1, e.g. 'hi') biases decoding AND the output
+        script — for Hindi/Urdu (one spoken language, two scripts) 'hi' keeps
+        transcripts in Devanagari instead of drifting to Perso-Arabic."""
         raise NotImplementedError

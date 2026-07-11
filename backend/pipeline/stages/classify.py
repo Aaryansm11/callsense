@@ -14,7 +14,12 @@ from sqlalchemy.orm import Session
 
 from analysis.llm import get_llm
 from db.models import CallStatus, FlagSeverity, FlagState, FlagTag
-from pipeline.stages.base import load_call, load_tx_segments, set_call_status
+from pipeline.stages.base import (
+    load_call,
+    load_tx_segments,
+    merge_raw_metadata,
+    set_call_status,
+)
 
 log = logging.getLogger("callsense.stage.classify")
 
@@ -39,7 +44,33 @@ def run(session: Session, call_id: int) -> None:
     )
 
     llm = get_llm(call.fixture)
-    if llm.is_sales_call(opening):
+    verdict = llm.classify(opening)
+
+    # Content-based role check: diarisation assigns "advisor" to the call
+    # opener, which is wrong when the customer answers first. If the opening's
+    # CONTENT says the rep is the speaker labelled "customer", swap all labels.
+    # Guarded by raw_metadata so a retried stage can't double-swap.
+    if (
+        verdict.get("advisor_is") == "customer"
+        and not call.raw_metadata.get("roles_swapped")
+    ):
+        session.execute(
+            text(
+                """
+                UPDATE segments s SET speaker = CASE s.speaker
+                    WHEN 'advisor' THEN 'customer'
+                    WHEN 'customer' THEN 'advisor'
+                    ELSE s.speaker END
+                FROM transcripts t
+                WHERE s.transcript_id = t.id AND t.call_id = :cid
+                """
+            ),
+            {"cid": call_id},
+        )
+        merge_raw_metadata(session, call_id, {"roles_swapped": True})
+        log.info("call %s: speaker roles swapped (content-based check)", call_id)
+
+    if verdict.get("sales", True):
         log.info("call %s classified as SALES", call_id)
         return
 
