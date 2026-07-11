@@ -59,7 +59,7 @@ def ingest(session: Session, env: CallEnvelope, queue: JobQueue) -> IngestResult
                  language_hint, raw_metadata, status, created_at, updated_at)
             VALUES
                 (:org_id, :advisor_id, :customer_ref, :source, :source_call_id,
-                 :idem, :audio_uri, :duration_s, :called_at, :channels,
+                 :idem, :audio_uri, :duration_s, COALESCE(:called_at, now()), :channels,
                  :language_hint, CAST(:raw AS jsonb), :status, now(), now())
             ON CONFLICT (idempotency_key) DO NOTHING
             RETURNING id
