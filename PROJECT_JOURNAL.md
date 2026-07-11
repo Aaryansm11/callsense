@@ -379,11 +379,40 @@ regression test recreating the exact failure shape
 ### `193968a` — README correction: the deployed LLM is **Gemini**, not
 Anthropic (Anthropic remains a supported swap) ([README.md](README.md)).
 
-### (this commit) — Journal expansion + repo hygiene
+### `de1f1df` — Journal expansion + repo hygiene
 Untracked accidentally-committed upload audio (`backend/demo/audio/store/*.mp3`
 — uploads land under `backend/` when the API runs from that directory, which
 the root ignore didn't cover) and ignored the path going forward
 ([.gitignore](.gitignore)).
+
+### `8009419` — Cloud persistence for the learning loop
+**Why (user-caught design conflict):** the container reseeded with a full
+TRUNCATE on every deploy — pristine demos, but it would have erased disputes
+and the calibration examples that make the prompt improve, i.e. the learning
+loop had amnesia. **What:** `SEED_MODE=if-empty` set on the deployment — the
+seed only writes into an empty database, so uploads, disputes and calibration
+rows now persist across every deploy; plus a files-only
+`regenerate_seed_audio()` path that redraws the 25 synthesized demo WAVs on
+the fresh container disk **without touching rows**, keeping demo play buttons
+alive ([demo/seed.py](demo/seed.py)). Accepted residual: audio of user uploads
+from a previous container life keeps its rows but loses playback (S3/object
+storage is the documented production fix). Consequence for testing: identical
+bytes now dedupe forever — retest = change the bytes, delete the row, or ask.
+
+### `2bd321f` — Default `called_at` to ingestion time
+**Why (user-caught):** the calls list showed "—" for manually uploaded calls.
+`called_at` is the vendor-supplied "when did this call happen" timestamp;
+manual uploads carry none. **What:** ingest now falls back to `now()` when the
+source provides no call time ([backend/ingestion/service.py](backend/ingestion/service.py));
+existing NULL rows backfilled from `created_at` directly on Neon.
+
+### (this commit) — About-page refresh + this journal update
+**Why:** the "How it works" page predated the diarisation sanity-check,
+content-based role assignment, scam classification, advisor-only flag policy,
+persistence model and upload limits — stale explainers erode trust. **What:**
+[frontend/app/about/page.tsx](frontend/app/about/page.tsx) updated (Diarise,
+Classify, Analyse steps; a new "What persists" paragraph; upload limits +
+cloud-vs-local Whisper note) and this changelog extended.
 
 ---
 

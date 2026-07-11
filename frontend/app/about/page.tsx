@@ -35,7 +35,7 @@ const PIPELINE = [
     icon: Users,
     name: "3 · Diarise",
     body:
-      "Who spoke when. Stereo calls split by channel (advisor left, customer right — zero ML, 100% accurate). Mono calls are clustered by voice: spectral envelope + pitch fingerprints per segment, two clusters, advisor = call opener. If voices aren't separable the page says so instead of pretending.",
+      "Who spoke when. True channel-separated stereo splits by channel (zero ML) — and the result is sanity-checked: if one 'speaker' swallows everything, the file is treated as mixed stereo and falls through to voice clustering (spectral envelope + pitch fingerprints, two clusters). Who is the advisor is decided by CONTENT — the classifier reads the opening and flips the labels if they're backwards. If voices aren't separable the page says so instead of pretending.",
   },
   {
     icon: EyeOff,
@@ -47,13 +47,13 @@ const PIPELINE = [
     icon: GitBranch,
     name: "5 · Classify",
     body:
-      "A cheap LLM pass answers one question: is this actually a sales conversation? Wrong numbers, internal calls and spam are tagged non-sales, excluded from every average, and never burn analysis tokens.",
+      "A cheap LLM pass answers two questions from the opening turns: is this actually a sales conversation (wrong numbers, support calls and remote-access/money-moving scams are ruled non-sales — tagged, excluded from every average, and never burn analysis tokens), and do the speaker labels match the content (swapped labels get flipped here).",
   },
   {
     icon: Scale,
     name: "6 · Analyse",
     body:
-      "The LLM scores five rubric dimensions (discovery, product knowledge, objection handling, compliance, next-step booking) and raises issue flags — but only inside a closed taxonomy, and only with verbatim quotes. Talk-ratio is computed by code from segment durations, never by the model.",
+      "The LLM scores five rubric dimensions (discovery, product knowledge, objection handling, compliance, next-step booking) and raises issue flags — but only inside a closed taxonomy, only with verbatim quotes, and only for ADVISOR utterances (a violating line attributed to the customer is downgraded to info for review). Talk-ratio is computed by code from segment durations, never by the model.",
   },
   {
     icon: ShieldCheck,
@@ -250,6 +250,16 @@ export default function AboutPage() {
               PII-redacted transcript text, sent to the LLM API for scoring.
               Transcription is local. In demo (mock) mode, nothing leaves at all.
             </p>
+            <p>
+              <b className="text-ink">What persists:</b> every database row —
+              calls, transcripts, scores, flags, disputes, and the calibration
+              examples the dispute loop generates — lives in managed Postgres
+              and survives every deploy. The hosted server&apos;s disk is
+              ephemeral: demo-call audio is regenerated on boot (it&apos;s
+              synthesized), while audio of user uploads from previous server
+              lives keeps its data but loses playback — durable object storage
+              (S3) is the documented production answer.
+            </p>
           </CardBody>
         </Card>
       </section>
@@ -288,6 +298,13 @@ export default function AboutPage() {
               First bottleneck at 10× scale: Whisper on CPU. Fix order: GPU
               worker pool → managed STT for overflow → materialise the rollup
               views. Nothing in the schema changes.
+            </p>
+            <p className="mt-2 text-xs text-muted">
+              Upload limits: ~4.5 MB per file on this hosted demo (uploads ride
+              the site&apos;s edge proxy) · 200 MB when talking to the API
+              directly · 10 uploads/min per IP. The hosted transcriber runs
+              Whisper <i>base</i> (free-tier RAM); local runs <i>small</i> —
+              one env var apart.
             </p>
           </CardBody>
         </Card>
