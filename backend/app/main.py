@@ -25,11 +25,25 @@ logging.basicConfig(
 )
 log = logging.getLogger("callsense.api")
 
+# docs_url=None: we serve Swagger ourselves with a RELATIVE openapi URL so the
+# docs work both on the direct domain (/docs) and through the Vercel edge proxy
+# (/api/backend/docs) — FastAPI's default hardcodes /openapi.json at the domain
+# root, which a path-prefixed proxy can't satisfy.
 app = FastAPI(
     title=f"{settings.app_name} API",
     version="0.1.0",
     summary="Sales-call intelligence for FitNova (SkilloVilla) — Phase 1 skeleton.",
+    docs_url=None,
+    redoc_url=None,
 )
+
+
+@app.get("/docs", include_in_schema=False)
+def swagger_docs():
+    from fastapi.openapi.docs import get_swagger_ui_html
+
+    # Relative URL: resolves against the page's own path, wherever it's mounted.
+    return get_swagger_ui_html(openapi_url="openapi.json", title=f"{settings.app_name} API — docs")
 
 # The Next.js dashboard is a browser client of this API. Wide-open CORS is fine
 # for a single-host demo; tighten to the web origin in prod.
