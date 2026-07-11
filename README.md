@@ -34,7 +34,8 @@ back into the prompt. One command brings the whole thing up.
   models), and turn-alternation only as the last resort with a low-confidence
   banner. `MockTranscriber` runs the loop with no model/network.
 - **Analysis engine** — rubric scoring + issue flags via an `LLM` interface
-  (Anthropic, or `MockLLM`), forced JSON + Pydantic validation, the
+  (**Gemini** by default; Anthropic or `MockLLM` swap in behind the same
+  interface), forced JSON + Pydantic validation, the
   **quote-verification gate** (fuzzy-match each quote to the transcript; unmatched →
   dropped), timestamps **derived** from the matched segment, confidence thresholding,
   and the **compliance cap** (a critical flag caps the composite at 40).
@@ -127,7 +128,7 @@ flowchart LR
 | Dashboards + call detail + audio-synced transcript | **Real** |
 | Dispute → recompute → calibration → audit loop | **Real** |
 | **Transcription** | Real `faster-whisper` in real mode; **`MockTranscriber`** returns a fixture transcript in `MOCK_MODE` |
-| **LLM analysis** | Real Anthropic in real mode; **`MockLLM`** returns a fixture analysis in `MOCK_MODE` (keyless demo) |
+| **LLM analysis** | Real **Gemini** in real mode (`LLM_PROVIDER=gemini`, the deployed default; Anthropic supported behind the same interface); **`MockLLM`** returns a fixture analysis in `MOCK_MODE` (keyless demo) |
 | Auth/SSO | Out of scope — role switcher + API-layer stub |
 | Live telephony | Out of scope — the adapter interface shows the plug-in point |
 
