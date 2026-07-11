@@ -77,6 +77,25 @@ def _channel_split(
         # Channels barely differ -> effectively mono; let the caller try the
         # acoustic (voice) path before any naive fallback.
         return None
+
+    # Sanity check the result: a genuinely channel-separated two-party call
+    # must yield BOTH speakers. If one label swallowed (nearly) everything,
+    # the "separation" was just a constant mixing imbalance (common in
+    # music-style/generated stereo files where both voices sit on both
+    # channels) -> not channel-separated; let voice clustering decide.
+    labelled = [s for s in segments if s.speaker in ("advisor", "customer")]
+    minority = min(
+        sum(1 for s in labelled if s.speaker == "advisor"),
+        sum(1 for s in labelled if s.speaker == "customer"),
+    )
+    if len(labelled) >= 4 and minority < max(2, len(labelled) // 10):
+        log.info(
+            "channel-split produced a one-sided result (%d/%d minority); "
+            "treating as mixed stereo and falling back to voice clustering",
+            minority, len(labelled),
+        )
+        return None
+
     return segments, round(min(1.0, 0.6 + mean_sep), 3)
 
 

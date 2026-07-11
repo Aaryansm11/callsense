@@ -86,3 +86,32 @@ def test_unreadable_audio_returns_none(tmp_path):
     path.write_bytes(b"definitely not audio")
     segs = [TxSegment(idx=0, start_s=0.0, end_s=1.0, text="x")]
     assert acoustic_diarise(str(path), segs) is None
+
+
+def test_biased_stereo_mix_falls_through_to_voice_clustering(tmp_path):
+    """Regression: a stereo file with BOTH voices mixed into BOTH channels and a
+    constant left-bias must NOT be treated as channel-separated (that labelled
+    every segment 'advisor' in production). diarise() must detect the one-sided
+    channel-split result and use voice clustering instead."""
+    from transcription.diarize import diarise
+
+    gap = np.zeros(int(0.3 * SR), dtype=np.float32)
+    order = [(115.0, 1.6), (230.0, 0.8), (115.0, 1.6), (115.0, 1.6), (230.0, 0.8), (230.0, 0.8)]
+    clips, segments, pos = [], [], 0.0
+    for i, (f0, bright) in enumerate(order):
+        clips += [_voice(f0, 2.0, brightness=bright), gap]
+        segments.append(TxSegment(idx=i, start_s=pos, end_s=pos + 2.0, text=f"t{i}"))
+        pos += 2.3
+    mono = np.concatenate(clips)
+    # Both voices on both channels; left is uniformly louder -> every segment
+    # is "left-heavy", the trap for naive channel-splitting.
+    stereo = np.stack([mono * 1.0, mono * 0.6], axis=1)
+    path = tmp_path / "biased_stereo.wav"
+    sf.write(str(path), stereo, SR)
+
+    labelled, confidence = diarise(str(path), channels=2, segments=segments)
+    speakers = {s.speaker for s in labelled}
+    assert speakers == {"advisor", "customer"}, f"one-sided labels: {speakers}"
+    # Same physical voice must share a label (clustered by voice, not channel).
+    assert labelled[0].speaker == labelled[2].speaker == labelled[3].speaker
+    assert labelled[1].speaker == labelled[4].speaker == labelled[5].speaker
