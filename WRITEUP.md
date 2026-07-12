@@ -19,7 +19,8 @@ trendy infra.
 | Decision | Why | Trade-off owned |
 |---|---|---|
 | **Postgres-backed queue** (`FOR UPDATE SKIP LOCKED`) | Transactional with the domain data; idempotency + dead-letter are just columns; safe multi-worker concurrency; honest at hundreds/day | Celery/Kafka would scale further — the `JobQueue` interface is the swap seam (4 methods) |
-| **Local faster-whisper** behind a `Transcriber` iface | ₹0/call, Hinglish, word timestamps, no vendor lock/PII egress | Cloud STT diarises better; that's the first thing I'd A/B with real calls |
+| **Local faster-whisper** behind a `Transcriber` iface | ₹0/call, Hinglish, word timestamps, no vendor lock/PII egress | Cloud STT diarises better; that's the first thing I'd A/B with real calls. Hosted demo runs `base` (free-tier RAM); local runs `small` — one env var apart |
+| **Gemini (flash-lite) as the deployed judge**, behind an `LLM` interface | Reliable free-tier quota, native JSON mode; verified catching violations on never-seen Hinglish transcripts | Anthropic/others swap in one class; client-side throttle + 429/503 backoff protects quotas |
 | **LLM scoring, not training** | Zero labelled data on day one; prompting + validation is high-quality immediately | Fine-tuning deferred until the dispute loop accumulates labels (roadmap) |
 | **Quote-verification gate** | Engineers hallucination *away* instead of prompting it away — every quote must fuzzy-match the transcript or the flag is dropped | Costs recall on paraphrased-but-real violations; a deliberate precision-over-recall stance |
 | **Compliance cap at 40** | Averaging lets a smooth talker launder a fake guarantee to 80; the cap makes the org's values legible in the math | Harsh by design; the dispute loop is the safety valve for false positives |
@@ -64,3 +65,38 @@ Every score row carries `rubric_version` + `prompt_hash`, so scores are only com
 within a version and prompt drift is detectable. A golden-set eval (`make eval`,
 roadmap) would report per-tag precision/recall on hand-labelled transcripts — the honest
 way to say "the LLM scores are right": don't assume, constrain and measure.
+
+## Where the system fails (candidly)
+
+- **Same-pitch voices on mono audio.** The numpy voice-clusterer separates on
+  spectral envelope + pitch; two similar same-gender voices can defeat it. It
+  degrades honestly (low-confidence banner, turn-based fallback) and the
+  classifier's content check re-orients advisor/customer, but labels can still
+  be wrong. Production fix: pyannote or a diarising cloud STT — one class swap.
+- **Noisy/accented audio on small Whisper models.** The hosted demo runs
+  `base` (free-tier RAM); it mishears more than local `small`, and much more
+  than managed Hinglish STT (Sarvam). Quality is a config dial, not a rewrite.
+- **Implicit mis-selling.** Sarcasm, soft pressure ("aap sochte rahiye, seats
+  toh nikal jayengi"), or violations spread across many turns can slip a
+  quote-anchored rubric. The confidence threshold + dispute loop bound the
+  damage; catching more of it is what the golden-set eval would measure.
+- **Borderline classification.** A scam call reads structurally like a sales
+  call; a messy transcript once flipped the verdict. The gate is prompt-tuned
+  (support/scam calls are non-sales) but a cheap classifier will sometimes be
+  wrong in both directions.
+- **Ephemeral audio in the cloud demo.** Rows persist (Neon); uploaded audio
+  files die with the container. Object storage (S3) is the production answer,
+  deliberately out of demo scope.
+
+## Deployed and verified
+
+Live: **https://callsense-aaryan-s-maralihallis-projects.vercel.app** (Vercel →
+Railway Docker → Neon Postgres; browser traffic rides a same-origin edge proxy
+because some Indian ISPs refuse DNS for `*.up.railway.app`). Real mode
+end-to-end in production: a Hinglish upload ran transcribe → diarise → redact →
+classify → analyse → validate in ~45 s, Gemini flagged `over_promising`
+(critical) with a quote-gate-verified quote and a code-derived timestamp.
+Measured: Whisper `small` ≈ 3.3× real-time per CPU worker (~300–400 five-minute
+calls/day/worker, horizontally scalable); ~500+ calls/day inside the free LLM
+quota; 38 automated tests; CI on every push. Full build history, pivots and all
+fifteen production bugs+fixes: [PROJECT_JOURNAL.md](PROJECT_JOURNAL.md).
