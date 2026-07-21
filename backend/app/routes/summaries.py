@@ -11,6 +11,24 @@ from db.session import get_db
 router = APIRouter(tags=["summaries"])
 
 
+@router.get("/advisors")
+def list_advisors(db: Session = Depends(get_db)) -> list[dict]:
+    """Advisor directory for the upload picker — so a manually uploaded call can
+    be attributed to a real advisor (not hardcoded). In production the source
+    payload carries the agent ref; this endpoint mirrors that choice in the UI."""
+    rows = db.execute(
+        text(
+            """
+            SELECT a.id, a.name, t.name AS team_name,
+                   (a.external_ids ->> 0) AS external_id
+            FROM advisors a JOIN teams t ON t.id = a.team_id
+            ORDER BY a.id
+            """
+        )
+    ).mappings().all()
+    return [dict(r) for r in rows]
+
+
 @router.get("/orgs/{org_id}/summary")
 def org_summary(org_id: int, db: Session = Depends(get_db)) -> dict:
     org = db.execute(

@@ -28,6 +28,10 @@ export function UploadCall() {
   const [dragOver, setDragOver] = useState(false);
   const [fixture, setFixture] = useState("over_promiser");
   const [language, setLanguage] = useState("hi");
+  const [advisors, setAdvisors] = useState<
+    { id: number; name: string; team_name: string; external_id: string }[]
+  >([]);
+  const [advisorExtId, setAdvisorExtId] = useState("AGT-1");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "info" | "warn" | "error"; text: string } | null>(null);
   // null = unknown (loading); true = canned fixtures; false = real Whisper+LLM
@@ -38,6 +42,17 @@ export function UploadCall() {
       .get<{ mock_mode: boolean }>("/")
       .then((meta) => setMockMode(meta.mock_mode))
       .catch(() => setMockMode(null));
+    // The advisor directory drives the picker so uploads aren't hardcoded to
+    // one advisor. Falls back to AGT-1 if the endpoint isn't reachable yet.
+    api
+      .get<typeof advisors>("/advisors")
+      .then((list) => {
+        if (list?.length) {
+          setAdvisors(list);
+          setAdvisorExtId(list[0].external_id);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const pick = useCallback((f: File | undefined | null) => {
@@ -65,7 +80,7 @@ export function UploadCall() {
     try {
       const form = new FormData();
       form.append("file", file);
-      form.append("advisor_external_id", "AGT-1");
+      form.append("advisor_external_id", advisorExtId);
       if (language) form.append("language_hint", language);
       if (mockMode) {
         form.append("fixture", fixture);
@@ -174,6 +189,25 @@ export function UploadCall() {
             <X size={14} />
           </button>
         </div>
+      )}
+
+      {/* Advisor attribution — in production this comes from the source
+          payload's agent ref; here the user picks so it isn't hardcoded. */}
+      {advisors.length > 0 && (
+        <label className="block text-xs text-muted">
+          Attribute to advisor
+          <select
+            value={advisorExtId}
+            onChange={(e) => setAdvisorExtId(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-border bg-white px-2.5 py-2 text-xs text-ink"
+          >
+            {advisors.map((a) => (
+              <option key={a.id} value={a.external_id}>
+                {a.name} · {a.team_name} ({a.external_id})
+              </option>
+            ))}
+          </select>
+        </label>
       )}
 
       {/* Language hint: keeps Whisper's Hindi output in Devanagari and biases
